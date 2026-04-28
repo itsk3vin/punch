@@ -24,8 +24,14 @@ func main() {
 		port = "8080"
 	}
 
+	auth, err := middleware.NewAuth0(context.Background())
+	if err != nil {
+		logger.Error("auth setup error", "err", err)
+		os.Exit(1)
+	}
+
 	mux := http.NewServeMux()
-	handler.Register(mux, logger)
+	handler.Register(mux, logger, auth)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
