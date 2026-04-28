@@ -10,15 +10,15 @@ export function HomeRoute() {
         Welcome to Punch
       </h1>
       <p className="mt-4 max-w-2xl text-muted-foreground">
-        This frontend is wired to the shared Tailwind and TypeScript config
-        packages and includes a few sample routes.
+        This frontend is wired to Auth0. Sign in to access the protected
+        dashboard and call the Go API with an access token.
       </p>
       <div className="mt-8 flex gap-3">
         <Link
           to="/auth/login"
           className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
         >
-          Try login route
+          Sign in
         </Link>
         <Link
           to="/dashboard"

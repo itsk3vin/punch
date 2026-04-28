@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router";
 
+import { RequireAuth } from "./auth";
 import { AppLayout } from "./routes/app-layout";
 import { LoginRoute } from "./routes/auth/login";
 import { DashboardRoute } from "./routes/dashboard";
@@ -17,7 +18,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "dashboard",
-        element: <DashboardRoute />,
+        element: (
+          <RequireAuth>
+            <DashboardRoute />
+          </RequireAuth>
+        ),
       },
       {
         path: "auth/login",

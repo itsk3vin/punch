@@ -1,20 +1,6 @@
 {
   "expo": {
     "name": "Punch",
-    "slug": "punch-mobile",
-    "version": "0.0.1",
-    "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
-    "assetBundlePatterns": ["**/*"],
-    "ios": {
-      "supportsTablet": true
-    },
-    "web": {
-      "bundler": "metro"
-    }
+    "slug": "punch-mobile"
   }
 }
