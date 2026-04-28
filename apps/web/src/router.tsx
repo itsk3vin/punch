@@ -2,9 +2,9 @@ import { createBrowserRouter } from "react-router";
 
 import { RequireAuth } from "./auth";
 import { AppLayout } from "./routes/app-layout";
-import { LoginRoute } from "./routes/auth/login";
 import { DashboardRoute } from "./routes/dashboard";
 import { NotFoundRoute } from "./routes/not-found";
+import { ScheduleRoute } from "./routes/schedule";
 
 export const router = createBrowserRouter([
   {
@@ -13,7 +13,6 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        path: "/",
         element: (
           <RequireAuth>
             <DashboardRoute />
@@ -21,8 +20,20 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "auth/login",
-        element: <LoginRoute />,
+        path: "dashboard",
+        element: (
+          <RequireAuth>
+            <DashboardRoute />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "schedule",
+        element: (
+          <RequireAuth>
+            <ScheduleRoute />
+          </RequireAuth>
+        ),
       },
       {
         path: "*",

@@ -1,6 +1,6 @@
 import { Auth0Provider, useAuth0 } from "@auth0/auth0-react";
-import type { PropsWithChildren } from "react";
-import { Navigate, useLocation } from "react-router";
+import { useEffect, type PropsWithChildren } from "react";
+import { useLocation } from "react-router";
 
 const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN;
 const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
@@ -46,7 +46,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
 export function RequireAuth({ children }: PropsWithChildren) {
   const location = useLocation();
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
+  const returnTo = `${location.pathname}${location.search}${location.hash}`;
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      void loginWithRedirect({
+        appState: { returnTo },
+      });
+    }
+  }, [isAuthenticated, isLoading, loginWithRedirect, returnTo]);
 
   if (isLoading) {
     return (
@@ -57,7 +66,11 @@ export function RequireAuth({ children }: PropsWithChildren) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/auth/login" state={{ from: location }} replace />;
+    return (
+      <section className="">
+        <p className="text-sm text-muted-foreground">Redirecting to sign in...</p>
+      </section>
+    );
   }
 
   return children;
