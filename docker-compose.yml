@@ -1,18 +1,18 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: alexandria-postgres
+    container_name: punch-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: alexandria
-      POSTGRES_USER: alexandria
-      POSTGRES_PASSWORD: alexandria
+      POSTGRES_DB: punch
+      POSTGRES_USER: punch
+      POSTGRES_PASSWORD: punch
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U alexandria -d alexandria"]
+      test: ["CMD-SHELL", "pg_isready -U punch -d punch"]
       interval: 5s
       timeout: 5s
       retries: 5

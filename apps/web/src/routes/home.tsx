@@ -7,7 +7,7 @@ export function HomeRoute() {
         Vite + React Router
       </p>
       <h1 className="mt-3 text-4xl font-bold tracking-tight">
-        Welcome to Alexandria
+        Welcome to Punch
       </h1>
       <p className="mt-4 max-w-2xl text-muted-foreground">
         This frontend is wired to the shared Tailwind and TypeScript config

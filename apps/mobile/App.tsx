@@ -12,7 +12,7 @@ export default function App() {
             Expo + NativeWind
           </Text>
           <Text className="mt-3 text-4xl font-bold text-white">
-            Alexandria Mobile
+            Punch Mobile
           </Text>
           <Text className="mt-4 text-base leading-7 text-slate-300">
             This app is scaffolded inside the pnpm workspace and consumes the

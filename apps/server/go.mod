@@ -1,3 +1,3 @@
-module alexandria/server
+module punch/server
 
 go 1.22

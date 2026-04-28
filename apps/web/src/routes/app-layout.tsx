@@ -11,7 +11,7 @@ export function AppLayout() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-card">
         <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <span className="text-lg font-semibold">Alexandria</span>
+          <span className="text-lg font-semibold">Punch</span>
           <div className="flex gap-2">
             {navItems.map((item) => (
               <NavLink

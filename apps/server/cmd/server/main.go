@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"alexandria/server/internal/handler"
-	"alexandria/server/internal/middleware"
+	"punch/server/internal/handler"
+	"punch/server/internal/middleware"
 )
 
 func main() {
