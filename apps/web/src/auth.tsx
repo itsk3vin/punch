@@ -27,6 +27,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     <Auth0Provider
       domain={auth0Domain}
       clientId={auth0ClientId}
+      cacheLocation="localstorage"
       onRedirectCallback={(appState) => {
         window.history.replaceState(
           {},
