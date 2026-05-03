@@ -1,14 +1,15 @@
 import { Outlet } from "react-router";
 
 import { Sidebar } from "@/components/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export function AppLayout() {
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <SidebarProvider>
       <Sidebar />
-      <main className="flex-1 overflow-y-auto px-8 py-10">
+      <SidebarInset className="overflow-y-auto px-8 py-10">
         <Outlet />
-      </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

@@ -1,13 +1,39 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { CalendarDays, LayoutDashboard } from "lucide-react";
-import { NavLink } from "react-router";
+import {
+  IconCalendar,
+  IconChevronUp,
+  IconLayoutDashboard,
+  IconLogout,
+  IconSettings,
+  IconUsers,
+} from "@tabler/icons-react";
+import { NavLink, useLocation } from "react-router";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Sidebar as ShadcnSidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+} from "@/components/ui/sidebar";
 
 const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/schedule", label: "Schedule", icon: CalendarDays },
+  { to: "/dashboard", label: "Dashboard", icon: IconLayoutDashboard },
+  { to: "/schedule", label: "Schedule", icon: IconCalendar },
 ];
 
 function getInitials(name?: string, email?: string) {
@@ -25,69 +51,114 @@ function getInitials(name?: string, email?: string) {
 
 export function Sidebar() {
   const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
+  const location = useLocation();
   const initials = getInitials(user?.name, user?.email);
 
   return (
-    <aside className="flex min-h-screen w-64 shrink-0 flex-col border-r border-border bg-card">
-      <div className="border-b border-border px-6 py-5">
-        <p className="text-lg font-semibold tracking-tight">Punch</p>
-      </div>
+    <ShadcnSidebar collapsible="icon">
+      <SidebarHeader className="px-4 py-5">
+        <p className="text-lg font-semibold tracking-tight group-data-[collapsible=icon]:sr-only">
+          Punch
+        </p>
+      </SidebarHeader>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-              )
-            }
-          >
-            <item.icon className="size-4" aria-hidden="true" />
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
+      <SidebarSeparator />
 
-      <div className="border-t border-border p-3">
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map((item) => (
+                <SidebarMenuItem key={item.to}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === item.to}
+                    tooltip={item.label}
+                  >
+                    <NavLink to={item.to}>
+                      <item.icon aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarSeparator />
+
+      <SidebarFooter>
         {isAuthenticated ? (
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-auto w-full justify-start gap-3 px-3 py-2"
-            onClick={() =>
-              logout({
-                logoutParams: { returnTo: window.location.origin },
-              })
-            }
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-              {initials}
-            </span>
-            <span className="min-w-0 text-left">
-              <span className="block truncate text-sm font-medium">
-                {user?.name ?? "Profile"}
-              </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {user?.email ?? "Sign out"}
-              </span>
-            </span>
-          </Button>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton size="lg" className="h-auto gap-3 py-2">
+                    {user?.picture ? (
+                      <img
+                        src={user.picture}
+                        alt=""
+                        className="size-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                        {initials}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                      <span className="flex flex-col gap-0.5">
+                        <span className="truncate text-xs font-normal">
+                          {user?.name ?? "Profile"}
+                        </span>
+                      </span>
+                    </span>
+                    <IconChevronUp className="ml-auto group-data-[collapsible=icon]:hidden" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  side="right"
+                  className="w-56"
+                >
+                  <DropdownMenuItem>
+                    <IconSettings aria-hidden="true" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <IconUsers aria-hidden="true" />
+                    Team
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() =>
+                      logout({
+                        logoutParams: { returnTo: window.location.origin },
+                      })
+                    }
+                  >
+                    <IconLogout aria-hidden="true" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
         ) : (
           <Button
             type="button"
             variant="ghost"
-            className="w-full justify-start"
+            className="w-full justify-start group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0"
             onClick={() => void loginWithRedirect()}
           >
-            Sign in
+            <span className="group-data-[collapsible=icon]:sr-only">
+              Sign in
+            </span>
           </Button>
         )}
-      </div>
-    </aside>
+      </SidebarFooter>
+    </ShadcnSidebar>
   );
 }
