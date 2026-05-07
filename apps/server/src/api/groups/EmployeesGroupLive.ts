@@ -7,6 +7,10 @@ import { Effect, Schema } from "effect"
 
 import { db } from "../../db/index.js"
 import { employees } from "../../db/schema.js"
+import {
+  handleAuthorizationError,
+  requireOrganizationAccess,
+} from "../middleware/organization.js"
 import { json } from "../response.js"
 
 const CreateEmployeeBody = Schema.Struct({
@@ -48,11 +52,23 @@ const getEmployeeFromUserId = Effect.gen(function* () {
     catch: () => new Error("failed to get employee"),
   })
 
-  if (results.length === 0) {
+  const targetEmployee = results[0]
+  if (!targetEmployee) {
     return yield* json({ error: "employee not found" }, 404)
   }
 
-  return yield* json(results[0])
+  if (!targetEmployee.organizationId) {
+    return yield* json({ error: "forbidden" }, 403)
+  }
+
+  const authorized = yield* requireOrganizationAccess(targetEmployee.organizationId).pipe(
+    Effect.either,
+  )
+  if (authorized._tag === "Left") {
+    return yield* handleAuthorizationError(authorized.left)
+  }
+
+  return yield* json(targetEmployee)
 })
 
 const createEmployee = Effect.gen(function* () {
@@ -104,6 +120,13 @@ const updateEmployee = Effect.gen(function* () {
 
 const getAllEmployeesByOrganizationId = Effect.gen(function* () {
   const { id: organizationId } = yield* HttpRouter.schemaPathParams(IdPathParams)
+
+  const authorized = yield* requireOrganizationAccess(organizationId).pipe(
+    Effect.either,
+  )
+  if (authorized._tag === "Left") {
+    return yield* handleAuthorizationError(authorized.left)
+  }
 
   const results = yield* Effect.tryPromise({
     try: () =>
