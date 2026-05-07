@@ -4,7 +4,6 @@ import {
 } from "@effect/platform"
 import { eq } from "drizzle-orm"
 import { Effect, Schema } from "effect"
-
 import { db } from "../../db/index.js"
 import { organizations } from "../../db/schema.js"
 import {
