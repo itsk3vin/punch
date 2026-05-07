@@ -1,9 +1,10 @@
 import { createBrowserRouter } from "react-router";
 
-import { RequireAuth } from "./auth";
+import { RequireAuth, RequireEmployee } from "./auth";
 import { AppLayout } from "./routes/app-layout";
 import { DashboardRoute } from "./routes/dashboard";
 import { NotFoundRoute } from "./routes/not-found";
+import { OnboardingRoute } from "./routes/onboarding";
 import { ScheduleRoute } from "./routes/schedule";
 
 export const router = createBrowserRouter([
@@ -15,7 +16,9 @@ export const router = createBrowserRouter([
         index: true,
         element: (
           <RequireAuth>
-            <DashboardRoute />
+            <RequireEmployee>
+              <DashboardRoute />
+            </RequireEmployee>
           </RequireAuth>
         ),
       },
@@ -23,7 +26,17 @@ export const router = createBrowserRouter([
         path: "dashboard",
         element: (
           <RequireAuth>
-            <DashboardRoute />
+            <RequireEmployee>
+              <DashboardRoute />
+            </RequireEmployee>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "onboarding",
+        element: (
+          <RequireAuth>
+            <OnboardingRoute />
           </RequireAuth>
         ),
       },
@@ -31,7 +44,9 @@ export const router = createBrowserRouter([
         path: "schedule",
         element: (
           <RequireAuth>
-            <ScheduleRoute />
+            <RequireEmployee>
+              <ScheduleRoute />
+            </RequireEmployee>
           </RequireAuth>
         ),
       },

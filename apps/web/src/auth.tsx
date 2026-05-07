@@ -1,6 +1,8 @@
 import { Auth0Provider, useAuth0 } from "@auth0/auth0-react";
 import { useEffect, type PropsWithChildren } from "react";
-import { useLocation } from "react-router";
+import { Navigate, useLocation } from "react-router";
+
+import { useEmployee } from "@/hooks/use-employee";
 
 const auth0Domain = import.meta.env.VITE_AUTH0_DOMAIN;
 const auth0ClientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
@@ -72,6 +74,35 @@ export function RequireAuth({ children }: PropsWithChildren) {
         <p className="text-sm text-muted-foreground">Redirecting to sign in...</p>
       </section>
     );
+  }
+
+  return children;
+}
+
+export function RequireEmployee({ children }: PropsWithChildren) {
+  const location = useLocation();
+  const { data, error, isLoading } = useEmployee();
+
+  if (isLoading) {
+    return (
+      <section className="rounded-lg border border-border bg-card p-8 shadow-sm">
+        <p className="text-sm text-muted-foreground">Loading workspace...</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="rounded-lg border border-border bg-card p-8 shadow-sm">
+        <p className="text-sm text-muted-foreground">
+          Could not load your workspace.
+        </p>
+      </section>
+    );
+  }
+
+  if (data?.status !== "ready") {
+    return <Navigate to="/onboarding" replace state={{ from: location }} />;
   }
 
   return children;

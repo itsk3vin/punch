@@ -1,0 +1,112 @@
+import { useAuth0 } from "@auth0/auth0-react";
+import { useEffect, useState } from "react";
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+
+type Employee = {
+  id: string;
+  userId: string;
+  organizationId: string;
+  email: string;
+  name: string;
+  role: string;
+};
+
+type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+};
+
+type InvitationSummary = {
+  id: string;
+  organizationId: string;
+  organizationName: string;
+  role: string;
+  email: string;
+};
+
+export type MeResponse =
+  | {
+      status: "ready";
+      employee: Employee;
+      organization: Organization;
+    }
+  | {
+      status: "has_invitations";
+      email: string;
+      invitations: InvitationSummary[];
+    }
+  | {
+      status: "needs_organization";
+      email: string;
+    }
+  | {
+      status: "email_unverified";
+      email: string;
+    };
+
+export function useEmployee() {
+  const { getAccessTokenSilently, isAuthenticated, isLoading } = useAuth0();
+  const [data, setData] = useState<MeResponse | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) {
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    async function loadEmployee() {
+      setIsFetching(true);
+      setError(null);
+
+      try {
+        const accessToken = await getAccessTokenSilently();
+        const response = await fetch(`${apiBaseUrl}/api/v1/me`, {
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+          },
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("failed to load employee");
+        }
+
+        setData((await response.json()) as MeResponse);
+      } catch (unknownError) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        setError(
+          unknownError instanceof Error
+            ? unknownError
+            : new Error("failed to load employee"),
+        );
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsFetching(false);
+        }
+      }
+    }
+
+    void loadEmployee();
+
+    return () => {
+      abortController.abort();
+    };
+  }, [getAccessTokenSilently, isAuthenticated, isLoading]);
+
+  return {
+    data,
+    employee: data?.status === "ready" ? data.employee : null,
+    organization: data?.status === "ready" ? data.organization : null,
+    error,
+    isLoading: isLoading || isFetching,
+  };
+}
