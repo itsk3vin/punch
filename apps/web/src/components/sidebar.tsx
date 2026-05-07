@@ -9,7 +9,7 @@ import {
 } from "@tabler/icons-react";
 import { NavLink, useLocation } from "react-router";
 
-import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -30,6 +30,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { useEmployee } from "@/hooks/use-employee";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: IconLayoutDashboard },
@@ -49,17 +50,38 @@ function getInitials(name?: string, email?: string) {
     .join("");
 }
 
+function getOrganizationInitials(name?: string) {
+  return getInitials(name, "Organization");
+}
+
 export function Sidebar() {
   const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
+  const { organization } = useEmployee();
   const location = useLocation();
   const initials = getInitials(user?.name, user?.email);
+  const organizationName = organization?.name ?? "Punch";
+  const organizationInitials = getOrganizationInitials(organization?.name);
 
   return (
     <ShadcnSidebar collapsible="icon">
-      <SidebarHeader className="px-4 py-5">
-        <p className="text-lg font-semibold tracking-tight group-data-[collapsible=icon]:sr-only">
-          Punch
-        </p>
+      <SidebarHeader className="px-3 py-2">
+        <div className="flex items-center gap-3">
+          <Avatar className="size-6 rounded-full">
+            <AvatarImage
+              src={organization?.logoUrl ?? undefined}
+              alt={`${organizationName} logo`}
+              className="rounded-full w-6 h-6 object-cover"
+            />
+            <AvatarFallback className="rounded-lg text-xs">
+              {organizationInitials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+            <p className="truncate text-sm font-medium tracking-tight">
+              {organizationName}
+            </p>
+          </div>
+        </div>
       </SidebarHeader>
 
       <SidebarSeparator />

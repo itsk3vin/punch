@@ -9,6 +9,14 @@ import { ScheduleRoute } from "./routes/schedule";
 
 export const router = createBrowserRouter([
   {
+    path: "/onboarding",
+    element: (
+      <RequireAuth>
+        <OnboardingRoute />
+      </RequireAuth>
+    ),
+  },
+  {
     path: "/",
     element: <AppLayout />,
     children: [
@@ -29,14 +37,6 @@ export const router = createBrowserRouter([
             <RequireEmployee>
               <DashboardRoute />
             </RequireEmployee>
-          </RequireAuth>
-        ),
-      },
-      {
-        path: "onboarding",
-        element: (
-          <RequireAuth>
-            <OnboardingRoute />
           </RequireAuth>
         ),
       },

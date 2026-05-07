@@ -17,6 +17,7 @@ import {
   invitations,
   organizations,
 } from "../../db/schema.js"
+import { getSignedAssetReadUrl } from "../../r2.js"
 import { json } from "../response.js"
 
 const EmployeeResponse = Schema.Struct({
@@ -102,6 +103,8 @@ const getMe = Effect.gen(function* () {
     const organization = organizationResults[0]
 
     if (organization) {
+      const logoUrl = yield* getSignedAssetReadUrl(organization.logoUrl)
+
       return yield* json({
         status: "ready",
         employee: {
@@ -116,7 +119,7 @@ const getMe = Effect.gen(function* () {
           id: organization.id,
           name: organization.name,
           slug: organization.slug,
-          logoUrl: organization.logoUrl,
+          logoUrl,
         },
       } satisfies MeResponse)
     }

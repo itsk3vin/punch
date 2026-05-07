@@ -6,6 +6,7 @@ export type AuthClaims = JWTPayload & {
   sub: string
   email?: string
   email_verified?: boolean
+  name?: string
 }
 
 const issuer = auth0Issuer(config.auth0.domain)

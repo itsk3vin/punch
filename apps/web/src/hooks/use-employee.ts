@@ -52,6 +52,7 @@ export function useEmployee() {
   const [data, setData] = useState<MeResponse | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [isFetching, setIsFetching] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) {
@@ -62,6 +63,7 @@ export function useEmployee() {
 
     async function loadEmployee() {
       setIsFetching(true);
+      setHasFetched(false);
       setError(null);
 
       try {
@@ -78,11 +80,13 @@ export function useEmployee() {
         }
 
         setData((await response.json()) as MeResponse);
+        setHasFetched(true);
       } catch (unknownError) {
         if (abortController.signal.aborted) {
           return;
         }
 
+        setHasFetched(true);
         setError(
           unknownError instanceof Error
             ? unknownError
@@ -107,6 +111,6 @@ export function useEmployee() {
     employee: data?.status === "ready" ? data.employee : null,
     organization: data?.status === "ready" ? data.organization : null,
     error,
-    isLoading: isLoading || isFetching,
+    isLoading: isLoading || isFetching || (isAuthenticated && !hasFetched),
   };
 }
