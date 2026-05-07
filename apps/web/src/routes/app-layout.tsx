@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export function AppLayout() {
+  
   return (
     <SidebarProvider>
       <Sidebar />
