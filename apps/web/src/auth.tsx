@@ -1,6 +1,6 @@
 import { Auth0Provider, useAuth0 } from "@auth0/auth0-react";
 import { useEffect, type PropsWithChildren } from "react";
-import { Navigate, useLocation } from "react-router";
+import { Navigate, useLocation, useParams } from "react-router";
 
 import { useEmployee } from "@/hooks/use-employee";
 
@@ -81,6 +81,7 @@ export function RequireAuth({ children }: PropsWithChildren) {
 
 export function RequireEmployee({ children }: PropsWithChildren) {
   const location = useLocation();
+  const { orgname } = useParams();
   const { data, error, isLoading } = useEmployee();
 
   if (isLoading) {
@@ -105,5 +106,26 @@ export function RequireEmployee({ children }: PropsWithChildren) {
     return <Navigate to="/onboarding" replace state={{ from: location }} />;
   }
 
+  if (orgname && orgname !== data.organization.slug) {
+    const pathWithoutOrg = location.pathname.replace(/^\/[^/]+/, "");
+
+    return (
+      <Navigate
+        to={`/${data.organization.slug}${pathWithoutOrg}${location.search}${location.hash}`}
+        replace
+      />
+    );
+  }
+
   return children;
+}
+
+export function NavigateToOrganization() {
+  const { organization } = useEmployee();
+
+  if (!organization) {
+    return null;
+  }
+
+  return <Navigate to={`/${organization.slug}`} replace />;
 }

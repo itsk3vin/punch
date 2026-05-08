@@ -16,6 +16,7 @@ type OnboardingFormValues = {
 
 type OrganizationResponse = {
   id: string;
+  slug: string;
   logoUrl: string | null;
 };
 
@@ -66,6 +67,7 @@ export function OnboardingRoute() {
 
   async function onSubmit(values: OnboardingFormValues) {
     setSubmitError(null);
+    const organizationSlug = slugify(values.companyName);
     const accessToken = await getAccessTokenSilently();
     const response = await fetch(`${apiBaseUrl}/api/v1/organization/create`, {
       method: "POST",
@@ -75,7 +77,7 @@ export function OnboardingRoute() {
       },
       body: JSON.stringify({
         name: values.companyName,
-        slug: slugify(values.companyName),
+        slug: organizationSlug,
         userEmail: user?.email,
         userName: user?.name,
       }),
@@ -144,7 +146,7 @@ export function OnboardingRoute() {
       }
     }
 
-    navigate("/dashboard", { replace: true });
+    navigate(`/${organization.slug ?? organizationSlug}`, { replace: true });
   }
 
   return (

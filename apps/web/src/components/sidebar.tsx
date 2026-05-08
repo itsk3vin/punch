@@ -1,14 +1,9 @@
-import { useAuth0 } from "@auth0/auth0-react";
 import {
   IconCalendar,
   IconChevronDown,
-  IconChevronUp,
   IconLayoutDashboard,
-  IconLogout,
-  IconSettings,
-  IconUsers,
 } from "@tabler/icons-react";
-import { NavLink, useLocation } from "react-router";
+import { NavLink, useLocation, useParams } from "react-router";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -33,11 +28,6 @@ import {
 } from "@/components/ui/sidebar";
 import { useEmployee } from "@/hooks/use-employee";
 
-const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: IconLayoutDashboard },
-  { to: "/schedule", label: "Schedule", icon: IconCalendar },
-];
-
 function getInitials(name?: string, email?: string) {
   const source = name || email || "User";
   const parts = source
@@ -56,12 +46,21 @@ function getOrganizationInitials(name?: string) {
 }
 
 export function Sidebar() {
-  const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
   const { organization } = useEmployee();
   const location = useLocation();
-  const initials = getInitials(user?.name, user?.email);
+  const { orgname } = useParams();
   const organizationName = organization?.name ?? "Punch";
   const organizationInitials = getOrganizationInitials(organization?.name);
+  const organizationPath = `/${orgname ?? organization?.slug ?? ""}`;
+  const currentPath = location.pathname.replace(/\/$/, "");
+  const navItems = [
+    {
+      to: organizationPath,
+      label: "Dashboard",
+      icon: IconLayoutDashboard,
+    },
+    { to: `${organizationPath}/schedule`, label: "Schedule", icon: IconCalendar },
+  ];
 
   return (
     <ShadcnSidebar collapsible="icon">
@@ -75,31 +74,35 @@ export function Sidebar() {
               className="flex w-fit items-center gap-3 rounded-md p-1 text-left hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             >
               <div className="flex items-center gap-2">
-              <Avatar className="size-5 rounded-sm">
-                <AvatarImage
-                  src={organization?.logoUrl ?? undefined}
-                  alt={`${organizationName} logo`}
-                  className="rounded-sm w-5 h-5 object-cover"
-                />
-                <AvatarFallback className="rounded-lg text-xs">
-                  {organizationInitials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                <p className="truncate text-sm font-medium tracking-tight">
-                  {organizationName}
-                </p>
-              </div>
+                <Avatar className="size-5 rounded-sm">
+                  <AvatarImage
+                    src={organization?.logoUrl ?? undefined}
+                    alt={`${organizationName} logo`}
+                    className="rounded-sm w-5 h-5 object-cover"
+                  />
+                  <AvatarFallback className="rounded-lg text-xs">
+                    {organizationInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                  <p className="truncate text-sm font-medium tracking-tight">
+                    {organizationName}
+                  </p>
+                </div>
               </div>
               <IconChevronDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="bottom" className="w-56">
-            <DropdownMenuItem>
-              Settings
+            <DropdownMenuItem asChild>
+              <NavLink to={`${organizationPath}/settings`}>
+                Settings
+              </NavLink>
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              Invite and manage members
+            <DropdownMenuItem asChild>
+              <NavLink to={`${organizationPath}/settings/members`}>
+                Invite and manage members
+              </NavLink>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
@@ -117,7 +120,7 @@ export function Sidebar() {
                 <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location.pathname === item.to}
+                    isActive={currentPath === item.to.replace(/\/$/, "")}
                     tooltip={item.label}
                   >
                     <NavLink to={item.to}>
@@ -133,8 +136,6 @@ export function Sidebar() {
       </SidebarContent>
 
       <SidebarSeparator />
-
-      
     </ShadcnSidebar>
   );
 }
