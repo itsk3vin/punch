@@ -24,19 +24,24 @@ function cropToCanvas(src: string, zoom: number): Promise<Blob> {
       const ctx = canvas.getContext("2d");
       if (!ctx) return reject(new Error("no canvas context"));
 
-      // The zoomed image is larger than the output box by `zoom`.
-      // We draw the centre-cropped portion of the original image.
-      const scaledW = img.naturalWidth * zoom;
-      const scaledH = img.naturalHeight * zoom;
-      const offsetX = (scaledW - OUTPUT_SIZE) / 2;
-      const offsetY = (scaledH - OUTPUT_SIZE) / 2;
+      // Match the preview: the image covers a square box, then zoom scales it
+      // from the center.
+      const scale =
+        Math.max(
+          OUTPUT_SIZE / img.naturalWidth,
+          OUTPUT_SIZE / img.naturalHeight,
+        ) * zoom;
+      const sourceW = OUTPUT_SIZE / scale;
+      const sourceH = OUTPUT_SIZE / scale;
+      const sourceX = (img.naturalWidth - sourceW) / 2;
+      const sourceY = (img.naturalHeight - sourceH) / 2;
 
       ctx.drawImage(
         img,
-        offsetX / zoom, // source x
-        offsetY / zoom, // source y
-        OUTPUT_SIZE / zoom, // source width
-        OUTPUT_SIZE / zoom, // source height
+        sourceX,
+        sourceY,
+        sourceW,
+        sourceH,
         0,
         0, // dest x, y
         OUTPUT_SIZE,

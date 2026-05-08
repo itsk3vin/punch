@@ -1,6 +1,7 @@
 import { useAuth0 } from "@auth0/auth0-react";
 import {
   IconCalendar,
+  IconChevronDown,
   IconChevronUp,
   IconLayoutDashboard,
   IconLogout,
@@ -65,26 +66,48 @@ export function Sidebar() {
   return (
     <ShadcnSidebar collapsible="icon">
       <SidebarHeader className="px-3 py-2">
-        <div className="flex items-center gap-3">
-          <Avatar className="size-6 rounded-full">
-            <AvatarImage
-              src={organization?.logoUrl ?? undefined}
-              alt={`${organizationName} logo`}
-              className="rounded-full w-6 h-6 object-cover"
-            />
-            <AvatarFallback className="rounded-lg text-xs">
-              {organizationInitials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-sm font-medium tracking-tight">
-              {organizationName}
-            </p>
-          </div>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="flex w-fit items-center gap-3 rounded-md p-1 text-left hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
+              <div className="flex items-center gap-2">
+              <Avatar className="size-5 rounded-sm">
+                <AvatarImage
+                  src={organization?.logoUrl ?? undefined}
+                  alt={`${organizationName} logo`}
+                  className="rounded-sm w-5 h-5 object-cover"
+                />
+                <AvatarFallback className="rounded-lg text-xs">
+                  {organizationInitials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                <p className="truncate text-sm font-medium tracking-tight">
+                  {organizationName}
+                </p>
+              </div>
+              </div>
+              <IconChevronDown className="ml-auto size-4 group-data-[collapsible=icon]:hidden text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="bottom" className="w-56">
+            <DropdownMenuItem>
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              Invite and manage members
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarHeader>
-
-      <SidebarSeparator />
 
       <SidebarContent>
         <SidebarGroup>
@@ -111,76 +134,7 @@ export function Sidebar() {
 
       <SidebarSeparator />
 
-      <SidebarFooter>
-        {isAuthenticated ? (
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton size="lg" className="h-auto gap-3 py-2">
-                    {user?.picture ? (
-                      <img
-                        src={user.picture}
-                        alt=""
-                        className="size-6 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                        {initials}
-                      </span>
-                    )}
-                    <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                      <span className="flex flex-col gap-0.5">
-                        <span className="truncate text-xs font-normal">
-                          {user?.name ?? "Profile"}
-                        </span>
-                      </span>
-                    </span>
-                    <IconChevronUp className="ml-auto group-data-[collapsible=icon]:hidden" />
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  side="right"
-                  className="w-56"
-                >
-                  <DropdownMenuItem>
-                    <IconSettings aria-hidden="true" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <IconUsers aria-hidden="true" />
-                    Team
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() =>
-                      logout({
-                        logoutParams: { returnTo: window.location.origin },
-                      })
-                    }
-                  >
-                    <IconLogout aria-hidden="true" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full justify-start group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0"
-            onClick={() => void loginWithRedirect()}
-          >
-            <span className="group-data-[collapsible=icon]:sr-only">
-              Sign in
-            </span>
-          </Button>
-        )}
-      </SidebarFooter>
+      
     </ShadcnSidebar>
   );
 }
