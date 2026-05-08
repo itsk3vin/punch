@@ -1,3 +1,4 @@
+import { useAuth0 } from "@auth0/auth0-react";
 import {
   IconCalendar,
   IconChevronDown,
@@ -46,6 +47,7 @@ function getOrganizationInitials(name?: string) {
 }
 
 export function Sidebar() {
+  const { logout } = useAuth0();
   const { organization } = useEmployee();
   const location = useLocation();
   const { orgname } = useParams();
@@ -105,7 +107,13 @@ export function Sidebar() {
               </NavLink>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                logout({
+                  logoutParams: { returnTo: window.location.origin },
+                })
+              }
+            >
               Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
