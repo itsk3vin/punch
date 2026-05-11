@@ -38,6 +38,7 @@ type OrganizationInvitation = {
   id: string;
   organizationId: string | null;
   email: string;
+  name: string;
   role: string;
   invitedBy: string | null;
   acceptedAt: string | null;
@@ -323,6 +324,7 @@ export function SettingsMembersRoute() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead className="text-right">Invited</TableHead>
@@ -332,7 +334,7 @@ export function SettingsMembersRoute() {
               {isLoading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={3}
+                    colSpan={4}
                     className="h-24 text-center text-muted-foreground"
                   >
                     Loading invitations...
@@ -341,7 +343,7 @@ export function SettingsMembersRoute() {
               ) : error ? (
                 <TableRow>
                   <TableCell
-                    colSpan={3}
+                    colSpan={4}
                     className="h-24 text-center text-destructive"
                   >
                     {error}
@@ -350,7 +352,7 @@ export function SettingsMembersRoute() {
               ) : sortedInvitations.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={3}
+                    colSpan={4}
                     className="h-24 text-center text-muted-foreground"
                   >
                     No pending invitations.
@@ -359,6 +361,9 @@ export function SettingsMembersRoute() {
               ) : (
                 sortedInvitations.map((invitation) => (
                   <TableRow key={invitation.id}>
+                    <TableCell className="font-medium">
+                      {invitation.name}
+                    </TableCell>
                     <TableCell className="font-medium">
                       {invitation.email}
                     </TableCell>

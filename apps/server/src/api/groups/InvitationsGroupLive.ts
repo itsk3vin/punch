@@ -19,7 +19,7 @@ import {
 import { json } from "../response.js"
 
 const CreateInvitationBody = Schema.Struct({
-  name: Schema.optional(Schema.String),
+  name: Schema.String,
   email: Schema.String,
   role: Schema.optional(Schema.String),
 })
@@ -77,6 +77,10 @@ const createInvitation = Effect.gen(function* () {
   if (email === "") {
     return yield* json({ error: "email is required" }, 400)
   }
+  const name = body.name.trim()
+  if (name === "") {
+    return yield* json({ error: "name is required" }, 400)
+  }
 
   const created = yield* Effect.tryPromise({
     try: () =>
@@ -85,6 +89,7 @@ const createInvitation = Effect.gen(function* () {
         .values({
           organizationId,
           email,
+          name,
           role: body.role ?? "employee",
           invitedBy: currentEmployee.id,
         })

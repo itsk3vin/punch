@@ -30,6 +30,7 @@ export const invitations = pgTable("invitations", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").references(() => organizations.id),
   email: text("email").notNull(),
+  name: text("name").notNull(),
   role: text("role").notNull().default("member"),
   invitedBy: uuid("invited_by").references(() => employees.id),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
