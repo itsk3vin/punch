@@ -63,7 +63,7 @@ export function SettingsProfileRoute() {
   return (
     <section className="max-w-[600px] w-[600px] mx-auto">
       <div className="flex flex-col gap-6">
-        <h1 className="text-xl font-semibold tracking-tight">Profile</h1>
+        <h1 className="text-xl font-medium tracking-tight">Profile</h1>
 
         <form
           className="rounded-xl border bg-card text-sm"
@@ -122,7 +122,7 @@ export function SettingsProfileRoute() {
 
           <div className="flex items-center justify-between px-5 py-4">
             <div />
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" size={"sm"} disabled={isSubmitting}>
               {isSubmitting ? "Saving..." : "Save changes"}
             </Button>
           </div>

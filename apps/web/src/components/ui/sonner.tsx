@@ -17,6 +17,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      richColors
       icons={{
         success: <IconCircleCheck className="size-4" />,
         info: <IconInfoCircle className="size-4" />,
@@ -35,6 +36,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast: "cn-toast",
+          success:
+            "border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300",
         },
       }}
       {...props}
