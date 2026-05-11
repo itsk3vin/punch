@@ -6,6 +6,7 @@ import { Effect } from "effect"
 
 import {
   EmployeesGroupLive,
+  InvitationsGroupLive,
   MeGroupLive,
   OrganizationGroupLive,
 } from "./api/groups/index.js"
@@ -23,6 +24,7 @@ export const app = HttpRouter.empty.pipe(
   HttpRouter.options("*", Effect.succeed(json({}))),
   HttpRouter.get("/health", health),
   HttpRouter.mount("/api/v1", EmployeesGroupLive),
+  HttpRouter.mount("/api/v1", InvitationsGroupLive),
   HttpRouter.mount("/api/v1", MeGroupLive),
   HttpRouter.mount("/api/v1", OrganizationGroupLive),
 )
