@@ -69,7 +69,6 @@ export function SettingsProfileRoute() {
           className="rounded-xl border bg-card text-sm"
           onSubmit={handleSubmit(onSubmit)}
         >
-          {/* Profile picture */}
           <div className="flex items-center justify-between px-5 py-4">
             <div>
               <p className="font-medium">Profile picture</p>
@@ -83,9 +82,7 @@ export function SettingsProfileRoute() {
               </AvatarFallback>
             </Avatar>
           </div>
-
           <Separator />
-
           <div className="flex items-center justify-between px-5 py-4">
             <p className="font-medium">Full name</p>
             <div className="w-[280px]">
@@ -107,7 +104,6 @@ export function SettingsProfileRoute() {
 
           <Separator />
 
-          {/* Email */}
           <div className="flex items-center justify-between px-5 py-4">
             <p className="font-medium">Email</p>
             <Input

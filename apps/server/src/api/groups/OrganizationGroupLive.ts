@@ -10,6 +10,7 @@ import {
 } from "../../r2.js"
 import {
   handleAuthorizationError,
+  requireOrganizationAdmin,
   requireOrganizationAccess,
 } from "../middleware/organization.js"
 import { json } from "../response.js"
@@ -89,7 +90,7 @@ const getOrganizationFromId = Effect.gen(function* () {
 const createOrganizationLogoUploadUrl = Effect.gen(function* () {
   const { id } = yield* HttpRouter.schemaPathParams(IdPathParams)
 
-  const authorized = yield* requireOrganizationAccess(id).pipe(Effect.either)
+  const authorized = yield* requireOrganizationAdmin(id).pipe(Effect.either)
   if (authorized._tag === "Left") {
     return yield* handleAuthorizationError(authorized.left)
   }
@@ -162,7 +163,7 @@ const updateOrganization = Effect.gen(function* () {
   )
   const { id, ...updates } = body
 
-  const authorized = yield* requireOrganizationAccess(id).pipe(Effect.either)
+  const authorized = yield* requireOrganizationAdmin(id).pipe(Effect.either)
   if (authorized._tag === "Left") {
     return yield* handleAuthorizationError(authorized.left)
   }

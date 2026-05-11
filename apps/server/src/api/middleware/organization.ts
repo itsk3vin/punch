@@ -70,6 +70,17 @@ export const requireOrganizationAccess = (organizationId: string) =>
     return currentEmployee
   })
 
+export const requireOrganizationAdmin = (organizationId: string) =>
+  Effect.gen(function* () {
+    const currentEmployee = yield* requireOrganizationAccess(organizationId)
+
+    if (currentEmployee.role !== "admin") {
+      return yield* Effect.fail(new ApiError("forbidden", 403))
+    }
+
+    return currentEmployee
+  })
+
 export const requirePathOrganizationAccess = Effect.gen(function* () {
   const { id: organizationId } = yield* HttpRouter.schemaPathParams(Schema.Struct({
     id: Schema.String,
