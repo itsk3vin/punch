@@ -478,14 +478,11 @@ export function SettingsMembersRoute() {
   }
 
   return (
-    <section className="mx-auto w-[760px] max-w-full">
+    <section className="w-full max-w-full">
       <div className="flex flex-col gap-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-medium tracking-tight">Members</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              View everyone who belongs to your organization.
-            </p>
           </div>
           {isAdmin && (
             <Button size="sm" onClick={() => setIsInviteDialogOpen(true)}>
@@ -494,15 +491,17 @@ export function SettingsMembersRoute() {
           )}
         </div>
 
-        <div className="overflow-hidden rounded-xl border bg-card text-sm">
-          <Table>
-            <TableHeader className="hover:bg-transparent">
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Joined</TableHead>
-                <TableHead className="w-[52px] text-right">Actions</TableHead>
+        <div className="w-full rounded-xl bg-card text-sm [&_table_td]:py-2 [&_table_th]:h-auto [&_table_th]:py-2 [&_table_th]:px-4 [&_table_td]:px-4">
+          <Table className="border-separate border-spacing-x-0 border-spacing-y-0.5 [&_tr[data-roster-row]>td]:transition-colors [&_tr[data-roster-row]>td:first-child]:rounded-l-lg [&_tr[data-roster-row]>td:last-child]:rounded-r-lg [&_tr[data-roster-row]:hover>td]:bg-muted/25">
+            <TableHeader className="hover:bg-transparent border-0">
+              <TableRow className="hover:bg-transparent border-0">
+                <TableHead className="border-0">Name</TableHead>
+                <TableHead className="border-0">Email</TableHead>
+                <TableHead className="border-0">Status</TableHead>
+                <TableHead className="border-0 text-right">Joined</TableHead>
+                <TableHead className="border-0 w-[52px] text-right">
+                  <span className="sr-only">Member menu</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -510,7 +509,7 @@ export function SettingsMembersRoute() {
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="h-24 text-center text-muted-foreground"
+                    className="py-10 text-center text-muted-foreground"
                   >
                     Loading members...
                   </TableCell>
@@ -519,7 +518,7 @@ export function SettingsMembersRoute() {
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="h-24 text-center text-destructive"
+                    className="py-10 text-center text-destructive"
                   >
                     {error}
                   </TableCell>
@@ -529,17 +528,17 @@ export function SettingsMembersRoute() {
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="h-24 text-center text-muted-foreground"
+                    className="py-10 text-center text-muted-foreground"
                   >
                     No members found.
                   </TableCell>
                 </TableRow>
               ) : (
                 <>
-                  <TableRow className="bg-muted/60 hover:bg-muted/60 h-8 px-4 py-2">
+                  <TableRow className="border-b-0 hover:bg-transparent [&>td]:p-2">
                     <TableCell
                       colSpan={5}
-                      className="h-8 font-medium text-muted-foreground px-4 py-2"
+                      className="rounded-lg bg-muted/60 px-4 py-1.5 font-medium text-muted-foreground"
                     >
                       Active{" "}
                       <span className="text-muted-foreground/70">
@@ -551,20 +550,24 @@ export function SettingsMembersRoute() {
                     <TableRow>
                       <TableCell
                         colSpan={5}
-                        className="h-24 text-center text-muted-foreground"
+                        className="py-10 text-center text-muted-foreground"
                       >
                         No active members found.
                       </TableCell>
                     </TableRow>
                   ) : (
                     sortedMembers.map((member) => (
-                      <TableRow key={member.id}>
+                      <TableRow
+                        key={member.id}
+                        data-roster-row=""
+                        className="hover:bg-transparent"
+                      >
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                            <div className="flex h-7 w-7 text-xs shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                               {getInitials(member.name, member.email)}
                             </div>
-                            <span className="font-medium">{member.name}</span>
+                            <span className="">{member.name}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
@@ -579,7 +582,7 @@ export function SettingsMembersRoute() {
                           {formatJoinedDate(member.createdAt)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {isAdmin ? (
+                          {isAdmin && employee?.id !== member.id ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -648,10 +651,10 @@ export function SettingsMembersRoute() {
 
                   {sortedInvitations.length > 0 && (
                     <>
-                      <TableRow className="bg-muted/60 hover:bg-muted/60 h-8 px-4 py-2">
+                      <TableRow className="border-0 hover:bg-transparent [&>td]:p-2">
                         <TableCell
                           colSpan={5}
-                          className="h-8 font-medium text-muted-foreground px-4 py-2"
+                          className="rounded-lg bg-muted/60 px-4 py-1.5 font-medium text-muted-foreground border-0"
                         >
                           Invited{" "}
                           <span className="text-muted-foreground/70">
@@ -660,13 +663,17 @@ export function SettingsMembersRoute() {
                         </TableCell>
                       </TableRow>
                       {sortedInvitations.map((invitation) => (
-                        <TableRow key={invitation.id}>
+                        <TableRow
+                          key={invitation.id}
+                          data-roster-row=""
+                          className="hover:bg-transparent"
+                        >
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-dashed text-xs font-medium text-muted-foreground">
+                              <div className="flex h-7 w-7 text-xs shrink-0 items-center justify-center rounded-full border border-dashed text-muted-foreground">
                                 {getInitials(invitation.name, invitation.email)}
                               </div>
-                              <span className="font-medium">
+                              <span className="">
                                 {invitation.name || invitation.email}
                               </span>
                             </div>

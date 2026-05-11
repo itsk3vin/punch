@@ -61,7 +61,7 @@ export function SettingsLayout() {
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="none" className="h-screen">
+      <Sidebar collapsible="none" className="h-screen border-r border-sidebar-border">
         <SidebarHeader className="px-3 py-2">
           <NavLink
             to={organizationPath}
