@@ -77,6 +77,16 @@ function formatRole(role: string) {
     .join(" ");
 }
 
+function getInitials(name: string, email: string) {
+  const source = name.trim() || email.trim();
+  const parts = source.split(/\s+|@/).filter(Boolean);
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
 export function SettingsMembersRoute() {
   const { getAccessTokenSilently } = useAuth0();
   const { employee, organization } = useEmployee();
@@ -136,7 +146,9 @@ export function SettingsMembersRoute() {
 
         if (!membersResponse.ok) {
           const body = await membersResponse.json().catch(() => null);
-          throw new Error(body?.error ?? "Could not load organization members.");
+          throw new Error(
+            body?.error ?? "Could not load organization members.",
+          );
         }
 
         if (!invitationsResponse.ok) {
@@ -264,7 +276,7 @@ export function SettingsMembersRoute() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Joined</TableHead>
               </TableRow>
             </TableHeader>
@@ -287,7 +299,8 @@ export function SettingsMembersRoute() {
                     {error}
                   </TableCell>
                 </TableRow>
-              ) : sortedMembers.length === 0 ? (
+              ) : sortedMembers.length === 0 &&
+                sortedInvitations.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={4}
@@ -297,82 +310,94 @@ export function SettingsMembersRoute() {
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedMembers.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell className="font-medium">{member.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {member.email}
-                    </TableCell>
-                    <TableCell>{formatRole(member.role)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {formatJoinedDate(member.createdAt)}
+                <>
+                  <TableRow className="bg-muted/60 hover:bg-muted/60">
+                    <TableCell
+                      colSpan={4}
+                      className="h-11 font-medium text-muted-foreground"
+                    >
+                      Active{" "}
+                      <span className="text-muted-foreground/70">
+                        {sortedMembers.length}
+                      </span>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                  {sortedMembers.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="h-24 text-center text-muted-foreground"
+                      >
+                        No active members found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sortedMembers.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                              {getInitials(member.name, member.email)}
+                            </div>
+                            <span className="font-medium">{member.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {member.email}
+                        </TableCell>
+                        <TableCell>
+                          <span className="rounded-md bg-primary/10 px-2 py-1 text-primary">
+                            {formatRole(member.role)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatJoinedDate(member.createdAt)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
 
-        <div className="overflow-hidden rounded-xl border bg-card text-sm">
-          <div className="border-b px-4 py-3">
-            <h2 className="font-medium">Invitations</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Pending invitations for people who have not joined yet.
-            </p>
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="text-right">Invited</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    Loading invitations...
-                  </TableCell>
-                </TableRow>
-              ) : error ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="h-24 text-center text-destructive"
-                  >
-                    {error}
-                  </TableCell>
-                </TableRow>
-              ) : sortedInvitations.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No pending invitations.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortedInvitations.map((invitation) => (
-                  <TableRow key={invitation.id}>
-                    <TableCell className="font-medium">
-                      {invitation.name}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {invitation.email}
-                    </TableCell>
-                    <TableCell>{formatRole(invitation.role)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {formatJoinedDate(invitation.createdAt)}
-                    </TableCell>
-                  </TableRow>
-                ))
+                  {sortedInvitations.length > 0 && (
+                    <>
+                      <TableRow className="bg-muted/60 hover:bg-muted/60">
+                        <TableCell
+                          colSpan={4}
+                          className="h-11 font-medium text-muted-foreground"
+                        >
+                          Invited{" "}
+                          <span className="text-muted-foreground/70">
+                            {sortedInvitations.length}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                      {sortedInvitations.map((invitation) => (
+                        <TableRow key={invitation.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-dashed text-xs font-medium text-muted-foreground">
+                                {getInitials(invitation.name, invitation.email)}
+                              </div>
+                              <span className="font-medium">
+                                {invitation.name || invitation.email}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {invitation.email}
+                          </TableCell>
+                          <TableCell>
+                            <span className="rounded-md bg-primary/10 px-2 py-1 text-primary">
+                              {formatRole(invitation.role)} (Invited)
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {formatJoinedDate(invitation.createdAt)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </>
+                  )}
+                </>
               )}
             </TableBody>
           </Table>

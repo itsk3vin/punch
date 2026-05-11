@@ -57,7 +57,13 @@ const listPendingInvitationsByOrganizationId = Effect.gen(function* () {
   })
 
   return yield* json(results)
-})
+}).pipe(
+  Effect.catchAll((error) =>
+    error instanceof Error
+      ? json({ error: error.message }, 400)
+      : json({ error: "failed to list invitations" }, 400),
+  ),
+)
 
 const createInvitation = Effect.gen(function* () {
   const { id: organizationId } = yield* HttpRouter.schemaPathParams(IdPathParams)
