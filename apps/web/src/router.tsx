@@ -7,7 +7,13 @@ import { NotFoundRoute } from "./routes/not-found";
 import { OnboardingRoute } from "./routes/onboarding";
 import { ScheduleRoute } from "./routes/schedule";
 import { SettingsRoute } from "./routes/settings";
+import { SettingsAvailabilityRoute } from "./routes/settings/availability";
+import { SettingsBillingRoute } from "./routes/settings/billing";
+import { SettingsCompanyProfileRoute } from "./routes/settings/company-profile";
+import { SettingsImportRoute } from "./routes/settings/import";
+import { SettingsLayout } from "./routes/settings/settings-layout";
 import { SettingsMembersRoute } from "./routes/settings/members";
+import { SettingsProfileRoute } from "./routes/settings/profile";
 
 export const router = createBrowserRouter([
   {
@@ -47,18 +53,48 @@ export const router = createBrowserRouter([
         element: <ScheduleRoute />,
       },
       {
-        path: "settings",
-        element: <SettingsRoute />,
-        children: [
-          {
-            path: "members",
-            element: <SettingsMembersRoute />,
-          },
-        ],
-      },
-      {
         path: "*",
         element: <NotFoundRoute />,
+      },
+    ],
+  },
+  {
+    path: "/:orgname/settings",
+    element: (
+      <RequireAuth>
+        <RequireEmployee>
+          <SettingsLayout />
+        </RequireEmployee>
+      </RequireAuth>
+    ),
+    children: [
+      {
+        index: true,
+        element: <SettingsRoute />,
+      },
+      {
+        path: "profile",
+        element: <SettingsProfileRoute />,
+      },
+      {
+        path: "availability",
+        element: <SettingsAvailabilityRoute />,
+      },
+      {
+        path: "company-profile",
+        element: <SettingsCompanyProfileRoute />,
+      },
+      {
+        path: "members",
+        element: <SettingsMembersRoute />,
+      },
+      {
+        path: "billing",
+        element: <SettingsBillingRoute />,
+      },
+      {
+        path: "import",
+        element: <SettingsImportRoute />,
       },
     ],
   },
