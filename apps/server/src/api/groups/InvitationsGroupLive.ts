@@ -33,6 +33,11 @@ const parseJsonBody = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
     Effect.mapError(() => new Error("invalid request body")),
   )
 
+const OrgInvitationPathParams = Schema.Struct({
+  id: Schema.String,
+  invitationId: Schema.String,
+})
+
 const listPendingInvitationsByOrganizationId = Effect.gen(function* () {
   const { id: organizationId } = yield* HttpRouter.schemaPathParams(IdPathParams)
 
@@ -112,7 +117,98 @@ const createInvitation = Effect.gen(function* () {
   ),
 )
 
+const resendInvitation = Effect.gen(function* () {
+  const { id: organizationId, invitationId } =
+    yield* HttpRouter.schemaPathParams(OrgInvitationPathParams)
+
+  const authorized = yield* requireOrganizationAdmin(organizationId).pipe(
+    Effect.either,
+  )
+  if (authorized._tag === "Left") {
+    return yield* handleAuthorizationError(authorized.left)
+  }
+
+  const updated = yield* Effect.tryPromise({
+    try: () =>
+      db
+        .update(invitations)
+        .set({
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(invitations.id, invitationId),
+          eq(invitations.organizationId, organizationId),
+          isNull(invitations.acceptedAt),
+          isNull(invitations.rejectedAt),
+        ))
+        .returning(),
+    catch: () => new Error("failed to resend invitation"),
+  })
+
+  if (updated.length === 0) {
+    return yield* json({ error: "invitation not found" }, 404)
+  }
+
+  return yield* json(updated[0])
+}).pipe(
+  Effect.catchAll((error) =>
+    error instanceof Error
+      ? json({ error: error.message }, 400)
+      : json({ error: "failed to resend invitation" }, 400),
+  ),
+)
+
+const revokeInvitation = Effect.gen(function* () {
+  const { id: organizationId, invitationId } =
+    yield* HttpRouter.schemaPathParams(OrgInvitationPathParams)
+
+  const authorized = yield* requireOrganizationAdmin(organizationId).pipe(
+    Effect.either,
+  )
+  if (authorized._tag === "Left") {
+    return yield* handleAuthorizationError(authorized.left)
+  }
+
+  const updated = yield* Effect.tryPromise({
+    try: () =>
+      db
+        .update(invitations)
+        .set({
+          rejectedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(invitations.id, invitationId),
+          eq(invitations.organizationId, organizationId),
+          isNull(invitations.acceptedAt),
+          isNull(invitations.rejectedAt),
+        ))
+        .returning(),
+    catch: () => new Error("failed to revoke invitation"),
+  })
+
+  if (updated.length === 0) {
+    return yield* json({ error: "invitation not found" }, 404)
+  }
+
+  return yield* json(updated[0])
+}).pipe(
+  Effect.catchAll((error) =>
+    error instanceof Error
+      ? json({ error: error.message }, 400)
+      : json({ error: "failed to revoke invitation" }, 400),
+  ),
+)
+
 export const InvitationsGroupLive = HttpRouter.empty.pipe(
   HttpRouter.get("/organizations/:id/invitations", listPendingInvitationsByOrganizationId),
+  HttpRouter.post(
+    "/organizations/:id/invitations/:invitationId/resend",
+    resendInvitation,
+  ),
+  HttpRouter.post(
+    "/organizations/:id/invitations/:invitationId/revoke",
+    revokeInvitation,
+  ),
   HttpRouter.post("/organizations/:id/invitations", createInvitation),
 )

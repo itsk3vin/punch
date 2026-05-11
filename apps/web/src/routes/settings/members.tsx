@@ -1,9 +1,17 @@
+import { IconDots } from "@tabler/icons-react";
 import { useAuth0 } from "@auth0/auth0-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -89,6 +97,7 @@ function getInitials(name: string, email: string) {
 
 export function SettingsMembersRoute() {
   const { getAccessTokenSilently } = useAuth0();
+  const navigate = useNavigate();
   const { employee, organization } = useEmployee();
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
@@ -96,6 +105,16 @@ export function SettingsMembersRoute() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [memberFieldEdit, setMemberFieldEdit] = useState<
+    null | { member: OrganizationMember; field: "name" | "email" | "role" }
+  >(null);
+  const [removeMember, setRemoveMember] = useState<OrganizationMember | null>(
+    null,
+  );
+  const [removing, setRemoving] = useState(false);
+  const [invitationToRevoke, setInvitationToRevoke] =
+    useState<OrganizationInvitation | null>(null);
+  const [revoking, setRevoking] = useState(false);
   const isAdmin = employee?.role === "admin";
   const {
     handleSubmit,
@@ -110,56 +129,100 @@ export function SettingsMembersRoute() {
     },
   });
 
+  const {
+    register: registerMemberField,
+    handleSubmit: handleMemberFieldSubmit,
+    reset: resetMemberField,
+    formState: {
+      errors: memberFieldErrors,
+      isSubmitting: isMemberFieldSubmitting,
+    },
+  } = useForm<{ value: string }>({
+    values: memberFieldEdit
+      ? {
+          value:
+            memberFieldEdit.field === "name"
+              ? memberFieldEdit.member.name
+              : memberFieldEdit.field === "email"
+                ? memberFieldEdit.member.email
+                : memberFieldEdit.member.role,
+        }
+      : { value: "" },
+  });
+
+  const loadRoster = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!organization) {
+        throw new Error("No organization.");
+      }
+      const organizationId = organization.id;
+      const accessToken = await getAccessTokenSilently();
+      const membersResponse = await fetch(
+        `${apiBaseUrl}/api/v1/employees/org/${organizationId}`,
+        {
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+          },
+          signal,
+        },
+      );
+      const invitationsResponse = await fetch(
+        `${apiBaseUrl}/api/v1/organizations/${organizationId}/invitations`,
+        {
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+          },
+          signal,
+        },
+      );
+
+      if (!membersResponse.ok) {
+        const body = await membersResponse.json().catch(() => null);
+        throw new Error(
+          body?.error ?? "Could not load organization members.",
+        );
+      }
+
+      if (!invitationsResponse.ok) {
+        const body = await invitationsResponse.json().catch(() => null);
+        throw new Error(body?.error ?? "Could not load invitations.");
+      }
+
+      return {
+        members: (await membersResponse.json()) as OrganizationMember[],
+        invitations: (await invitationsResponse.json()) as OrganizationInvitation[],
+      };
+    },
+    [getAccessTokenSilently, organization],
+  );
+
+  async function refreshRosterQuiet() {
+    try {
+      const data = await loadRoster();
+      setMembers(data.members);
+      setInvitations(data.invitations);
+    } catch {
+      toast.error("Could not refresh the member list.");
+    }
+  }
   useEffect(() => {
     if (!organization) {
       setIsLoading(false);
       return;
     }
 
-    const organizationId = organization.id;
     const abortController = new AbortController();
 
-    async function loadMembers() {
+    async function run() {
       setIsLoading(true);
       setError(null);
 
       try {
-        const accessToken = await getAccessTokenSilently();
-        const membersResponse = await fetch(
-          `${apiBaseUrl}/api/v1/employees/org/${organizationId}`,
-          {
-            headers: {
-              authorization: `Bearer ${accessToken}`,
-            },
-            signal: abortController.signal,
-          },
-        );
-        const invitationsResponse = await fetch(
-          `${apiBaseUrl}/api/v1/organizations/${organizationId}/invitations`,
-          {
-            headers: {
-              authorization: `Bearer ${accessToken}`,
-            },
-            signal: abortController.signal,
-          },
-        );
-
-        if (!membersResponse.ok) {
-          const body = await membersResponse.json().catch(() => null);
-          throw new Error(
-            body?.error ?? "Could not load organization members.",
-          );
+        const data = await loadRoster(abortController.signal);
+        if (!abortController.signal.aborted) {
+          setMembers(data.members);
+          setInvitations(data.invitations);
         }
-
-        if (!invitationsResponse.ok) {
-          const body = await invitationsResponse.json().catch(() => null);
-          throw new Error(body?.error ?? "Could not load invitations.");
-        }
-
-        setMembers((await membersResponse.json()) as OrganizationMember[]);
-        setInvitations(
-          (await invitationsResponse.json()) as OrganizationInvitation[],
-        );
       } catch (unknownError) {
         if (abortController.signal.aborted) {
           return;
@@ -177,12 +240,12 @@ export function SettingsMembersRoute() {
       }
     }
 
-    void loadMembers();
+    void run();
 
     return () => {
       abortController.abort();
     };
-  }, [getAccessTokenSilently, organization]);
+  }, [loadRoster, organization]);
 
   const sortedMembers = useMemo(
     () =>
@@ -235,14 +298,11 @@ export function SettingsMembersRoute() {
         throw new Error(body?.error ?? "Could not invite member.");
       }
 
-      const invitation = (await response.json()) as OrganizationInvitation;
-      setInvitations((currentInvitations) => [
-        invitation,
-        ...currentInvitations,
-      ]);
+      await response.json().catch(() => null);
       reset();
       setIsInviteDialogOpen(false);
       toast.success("Invitation created.");
+      await refreshRosterQuiet();
     } catch (unknownError) {
       const message =
         unknownError instanceof Error
@@ -250,6 +310,170 @@ export function SettingsMembersRoute() {
           : "Could not invite member.";
       setInviteError(message);
       toast.error(message);
+    }
+  }
+
+  async function submitMemberField(values: { value: string }) {
+    if (!memberFieldEdit || !organization) {
+      return;
+    }
+
+    const { member, field } = memberFieldEdit;
+    const nextValue = values.value.trim();
+    if (field !== "role" && nextValue === "") {
+      toast.error("Value is required.");
+      return;
+    }
+
+    try {
+      const accessToken = await getAccessTokenSilently();
+      const body: {
+        id: string;
+        name?: string;
+        email?: string;
+        role?: string;
+      } = { id: member.id };
+
+      if (field === "name") {
+        body.name = nextValue;
+      } else if (field === "email") {
+        body.email = nextValue;
+      } else {
+        body.role = values.value;
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/v1/employee/update`, {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const responseBody = await response.json().catch(() => null);
+        throw new Error(responseBody?.error ?? "Could not update member.");
+      }
+
+      toast.success("Member updated.");
+      setMemberFieldEdit(null);
+      resetMemberField();
+      await refreshRosterQuiet();
+    } catch (unknownError) {
+      toast.error(
+        unknownError instanceof Error
+          ? unknownError.message
+          : "Could not update member.",
+      );
+    }
+  }
+
+  async function confirmRemoveMember() {
+    if (!removeMember || !organization) {
+      return;
+    }
+
+    setRemoving(true);
+
+    try {
+      const accessToken = await getAccessTokenSilently();
+      const response = await fetch(`${apiBaseUrl}/api/v1/employee/remove`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ id: removeMember.id }),
+      });
+
+      if (!response.ok) {
+        const responseBody = await response.json().catch(() => null);
+        throw new Error(responseBody?.error ?? "Could not remove member.");
+      }
+
+      toast.success("Member removed.");
+      setRemoveMember(null);
+      await refreshRosterQuiet();
+    } catch (unknownError) {
+      toast.error(
+        unknownError instanceof Error
+          ? unknownError.message
+          : "Could not remove member.",
+      );
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  async function confirmRevokeInvitation() {
+    if (!invitationToRevoke || !organization) {
+      return;
+    }
+
+    setRevoking(true);
+
+    try {
+      const accessToken = await getAccessTokenSilently();
+      const response = await fetch(
+        `${apiBaseUrl}/api/v1/organizations/${organization.id}/invitations/${invitationToRevoke.id}/revoke`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const responseBody = await response.json().catch(() => null);
+        throw new Error(responseBody?.error ?? "Could not revoke invitation.");
+      }
+
+      toast.success("Invitation revoked.");
+      setInvitationToRevoke(null);
+      await refreshRosterQuiet();
+    } catch (unknownError) {
+      toast.error(
+        unknownError instanceof Error
+          ? unknownError.message
+          : "Could not revoke invitation.",
+      );
+    } finally {
+      setRevoking(false);
+    }
+  }
+
+  async function resendInvitation(invitation: OrganizationInvitation) {
+    if (!organization) {
+      return;
+    }
+
+    try {
+      const accessToken = await getAccessTokenSilently();
+      const response = await fetch(
+        `${apiBaseUrl}/api/v1/organizations/${organization.id}/invitations/${invitation.id}/resend`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const responseBody = await response.json().catch(() => null);
+        throw new Error(responseBody?.error ?? "Could not resend invitation.");
+      }
+
+      toast.success("Invitation updated.");
+      await refreshRosterQuiet();
+    } catch (unknownError) {
+      toast.error(
+        unknownError instanceof Error
+          ? unknownError.message
+          : "Could not resend invitation.",
+      );
     }
   }
 
@@ -272,19 +496,20 @@ export function SettingsMembersRoute() {
 
         <div className="overflow-hidden rounded-xl border bg-card text-sm">
           <Table>
-            <TableHeader>
-              <TableRow>
+            <TableHeader className="hover:bg-transparent">
+              <TableRow className="hover:bg-transparent">
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Joined</TableHead>
+                <TableHead className="w-[52px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="h-24 text-center text-muted-foreground"
                   >
                     Loading members...
@@ -293,7 +518,7 @@ export function SettingsMembersRoute() {
               ) : error ? (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="h-24 text-center text-destructive"
                   >
                     {error}
@@ -303,7 +528,7 @@ export function SettingsMembersRoute() {
                 sortedInvitations.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="h-24 text-center text-muted-foreground"
                   >
                     No members found.
@@ -311,10 +536,10 @@ export function SettingsMembersRoute() {
                 </TableRow>
               ) : (
                 <>
-                  <TableRow className="bg-muted/60 hover:bg-muted/60">
+                  <TableRow className="bg-muted/60 hover:bg-muted/60 h-8 px-4 py-2">
                     <TableCell
-                      colSpan={4}
-                      className="h-11 font-medium text-muted-foreground"
+                      colSpan={5}
+                      className="h-8 font-medium text-muted-foreground px-4 py-2"
                     >
                       Active{" "}
                       <span className="text-muted-foreground/70">
@@ -325,7 +550,7 @@ export function SettingsMembersRoute() {
                   {sortedMembers.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={4}
+                        colSpan={5}
                         className="h-24 text-center text-muted-foreground"
                       >
                         No active members found.
@@ -353,16 +578,80 @@ export function SettingsMembersRoute() {
                         <TableCell className="text-right text-muted-foreground">
                           {formatJoinedDate(member.createdAt)}
                         </TableCell>
+                        <TableCell className="text-right">
+                          {isAdmin ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-8"
+                                >
+                                  <IconDots className="size-4 text-muted-foreground" />
+                                  <span className="sr-only">Open menu</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    setMemberFieldEdit({
+                                      member,
+                                      field: "name",
+                                    })
+                                  }
+                                >
+                                  Update name
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    setMemberFieldEdit({
+                                      member,
+                                      field: "email",
+                                    })
+                                  }
+                                >
+                                  Update email
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    setMemberFieldEdit({
+                                      member,
+                                      field: "role",
+                                    })
+                                  }
+                                >
+                                  Update role
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    navigate(
+                                      `/${organization?.slug}/settings/availability?employeeId=${member.id}`,
+                                    )
+                                  }
+                                >
+                                  Update availability
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onSelect={() => setRemoveMember(member)}
+                                >
+                                  Remove person
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : null}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
 
                   {sortedInvitations.length > 0 && (
                     <>
-                      <TableRow className="bg-muted/60 hover:bg-muted/60">
+                      <TableRow className="bg-muted/60 hover:bg-muted/60 h-8 px-4 py-2">
                         <TableCell
-                          colSpan={4}
-                          className="h-11 font-medium text-muted-foreground"
+                          colSpan={5}
+                          className="h-8 font-medium text-muted-foreground px-4 py-2"
                         >
                           Invited{" "}
                           <span className="text-muted-foreground/70">
@@ -392,6 +681,40 @@ export function SettingsMembersRoute() {
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">
                             {formatJoinedDate(invitation.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {isAdmin ? (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-8"
+                                  >
+                                    <IconDots className="size-4 text-muted-foreground" />
+                                    <span className="sr-only">Open menu</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      void resendInvitation(invitation);
+                                    }}
+                                  >
+                                    Resend invite
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onSelect={() =>
+                                      setInvitationToRevoke(invitation)
+                                    }
+                                  >
+                                    Revoke access
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            ) : null}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -495,6 +818,161 @@ export function SettingsMembersRoute() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={memberFieldEdit !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setMemberFieldEdit(null);
+            resetMemberField();
+          }
+        }}
+      >
+        <DialogContent>
+          <form
+            onSubmit={handleMemberFieldSubmit((data) => void submitMemberField(data))}
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {memberFieldEdit?.field === "name"
+                  ? "Update name"
+                  : memberFieldEdit?.field === "email"
+                    ? "Update email"
+                    : "Update role"}
+              </DialogTitle>
+              <DialogDescription>
+                {memberFieldEdit?.member.name} ({memberFieldEdit?.member.email})
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-4 grid gap-2">
+              {memberFieldEdit?.field === "role" ? (
+                <select
+                  id="member-field-value"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isMemberFieldSubmitting}
+                  {...registerMemberField("value", { required: true })}
+                >
+                  <option value="employee">Employee</option>
+                  <option value="admin">Admin</option>
+                </select>
+              ) : (
+                <Input
+                  id="member-field-value"
+                  type={
+                    memberFieldEdit?.field === "email" ? "email" : "text"
+                  }
+                  disabled={isMemberFieldSubmitting}
+                  {...registerMemberField("value", {
+                    required: "This field is required",
+                    validate: (v) =>
+                      v.trim().length > 0 || "This field is required",
+                  })}
+                />
+              )}
+              {memberFieldErrors.value && (
+                <p className="text-xs text-destructive">
+                  {memberFieldErrors.value.message}
+                </p>
+              )}
+            </div>
+
+            <DialogFooter className="mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isMemberFieldSubmitting}
+                onClick={() => setMemberFieldEdit(null)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isMemberFieldSubmitting}>
+                {isMemberFieldSubmitting ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={removeMember !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemoveMember(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove person</DialogTitle>
+            <DialogDescription>
+              Remove{" "}
+              <span className="font-medium text-foreground">
+                {removeMember?.name}
+              </span>{" "}
+              from the organization? This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={removing}
+              onClick={() => setRemoveMember(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={removing}
+              onClick={() => void confirmRemoveMember()}
+            >
+              {removing ? "Removing..." : "Remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={invitationToRevoke !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setInvitationToRevoke(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke access</DialogTitle>
+            <DialogDescription>
+              Revoke the pending invitation for{" "}
+              <span className="font-medium text-foreground">
+                {invitationToRevoke?.email}
+              </span>
+              ? They will no longer be able to join with this invite.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={revoking}
+              onClick={() => setInvitationToRevoke(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={revoking}
+              onClick={() => void confirmRevokeInvitation()}
+            >
+              {revoking ? "Revoking..." : "Revoke"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </section>

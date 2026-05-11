@@ -10,6 +10,7 @@ import { employees } from "../../db/schema.js"
 import {
   handleAuthorizationError,
   requireOrganizationAccess,
+  requireOrganizationAdmin,
 } from "../middleware/organization.js"
 import { json } from "../response.js"
 
@@ -21,13 +22,15 @@ const CreateEmployeeBody = Schema.Struct({
   role: Schema.optional(Schema.String),
 })
 
-const UpdateEmployeeBody = Schema.Struct({
+const AdminUpdateEmployeeBody = Schema.Struct({
   id: Schema.String,
-  userId: Schema.optional(Schema.String),
-  organizationId: Schema.optional(Schema.String),
   email: Schema.optional(Schema.String),
   name: Schema.optional(Schema.String),
   role: Schema.optional(Schema.String),
+})
+
+const RemoveEmployeeBody = Schema.Struct({
+  id: Schema.String,
 })
 
 const IdPathParams = Schema.Struct({
@@ -91,19 +94,73 @@ const createEmployee = Effect.gen(function* () {
 )
 
 const updateEmployee = Effect.gen(function* () {
-  const body = yield* parseJsonBody(UpdateEmployeeBody).pipe(
+  const body = yield* parseJsonBody(AdminUpdateEmployeeBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
   )
-  const { id, ...updates } = body
+  const { id, name, email, role } = body
+
+  const existingRows = yield* Effect.tryPromise({
+    try: () =>
+      db
+        .select()
+        .from(employees)
+        .where(eq(employees.id, id))
+        .limit(1),
+    catch: () => new Error("failed to get employee"),
+  })
+
+  const target = existingRows[0]
+  if (!target) {
+    return yield* json({ error: "employee not found" }, 404)
+  }
+
+  if (!target.organizationId) {
+    return yield* json({ error: "forbidden" }, 403)
+  }
+
+  const authorized = yield* requireOrganizationAdmin(target.organizationId).pipe(
+    Effect.either,
+  )
+  if (authorized._tag === "Left") {
+    return yield* handleAuthorizationError(authorized.left)
+  }
+
+  const updates: {
+    name?: string
+    email?: string
+    role?: string
+    updatedAt: Date
+  } = { updatedAt: new Date() }
+
+  if (name !== undefined) {
+    const next = name.trim()
+    if (next === "") {
+      return yield* json({ error: "name is required" }, 400)
+    }
+    updates.name = next
+  }
+
+  if (email !== undefined) {
+    const next = email.trim().toLowerCase()
+    if (next === "") {
+      return yield* json({ error: "email is required" }, 400)
+    }
+    updates.email = next
+  }
+
+  if (role !== undefined) {
+    updates.role = role
+  }
+
+  if (Object.keys(updates).length === 1) {
+    return yield* json({ error: "no updates provided" }, 400)
+  }
 
   const updated = yield* Effect.tryPromise({
     try: () =>
       db
         .update(employees)
-        .set({
-          ...updates,
-          updatedAt: new Date(),
-        })
+        .set(updates)
         .where(eq(employees.id, id))
         .returning(),
     catch: () => new Error("failed to update employee"),
@@ -114,6 +171,50 @@ const updateEmployee = Effect.gen(function* () {
   }
 
   return yield* json(updated[0])
+}).pipe(
+  Effect.catchAll((error) => json({ error: error.message }, 400)),
+)
+
+const removeEmployee = Effect.gen(function* () {
+  const body = yield* parseJsonBody(RemoveEmployeeBody).pipe(
+    Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
+  )
+
+  const existingRows = yield* Effect.tryPromise({
+    try: () =>
+      db
+        .select()
+        .from(employees)
+        .where(eq(employees.id, body.id))
+        .limit(1),
+    catch: () => new Error("failed to get employee"),
+  })
+
+  const target = existingRows[0]
+  if (!target) {
+    return yield* json({ error: "employee not found" }, 404)
+  }
+
+  if (!target.organizationId) {
+    return yield* json({ error: "forbidden" }, 403)
+  }
+
+  const authorized = yield* requireOrganizationAdmin(target.organizationId).pipe(
+    Effect.either,
+  )
+  if (authorized._tag === "Left") {
+    return yield* handleAuthorizationError(authorized.left)
+  }
+
+  yield* Effect.tryPromise({
+    try: () =>
+      db
+        .delete(employees)
+        .where(eq(employees.id, body.id)),
+    catch: () => new Error("failed to remove employee"),
+  })
+
+  return yield* json({ ok: true })
 }).pipe(
   Effect.catchAll((error) => json({ error: error.message }, 400)),
 )
@@ -144,5 +245,6 @@ export const EmployeesGroupLive = HttpRouter.empty.pipe(
   HttpRouter.get("/employee/:id", getEmployeeFromUserId),
   HttpRouter.post("/employee/create", createEmployee),
   HttpRouter.put("/employee/update", updateEmployee),
+  HttpRouter.post("/employee/remove", removeEmployee),
   HttpRouter.get("/employees/org/:id", getAllEmployeesByOrganizationId),
 )
