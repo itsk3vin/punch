@@ -44,6 +44,10 @@ const InvitationSummary = Schema.Struct({
   email: Schema.String,
 })
 
+const UpdateProfileBody = Schema.Struct({
+  name: Schema.String,
+})
+
 const MeResponse = Schema.Union(
   Schema.Struct({
     status: Schema.Literal("ready"),
@@ -67,11 +71,20 @@ const MeResponse = Schema.Union(
 
 export type MeResponse = Schema.Schema.Type<typeof MeResponse>
 
-const getMe = Effect.gen(function* () {
-  const request = yield* HttpServerRequest.HttpServerRequest
-  const authorization = Headers.get(request.headers, "authorization").pipe(
-    (option) => option._tag === "Some" ? option.value : undefined,
+const parseJsonBody = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
+  HttpServerRequest.schemaBodyJson(schema).pipe(
+    Effect.mapError(() => new Error("invalid request body")),
   )
+
+const getAuthorizationHeader = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest
+  return Headers.get(request.headers, "authorization").pipe((option) =>
+    option._tag === "Some" ? option.value : undefined,
+  )
+})
+
+const getMe = Effect.gen(function* () {
+  const authorization = yield* getAuthorizationHeader
 
   const claims = yield* Effect.tryPromise({
     try: () => verifyBearerToken(authorization),
@@ -184,6 +197,50 @@ const getMe = Effect.gen(function* () {
   ),
 )
 
+const updateProfile = Effect.gen(function* () {
+  const body = yield* parseJsonBody(UpdateProfileBody).pipe(
+    Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
+  )
+  const name = body.name.trim()
+  if (name === "") {
+    return yield* json({ error: "name is required" }, 400)
+  }
+
+  const authorization = yield* getAuthorizationHeader
+  const claims = yield* Effect.tryPromise({
+    try: () => verifyBearerToken(authorization),
+    catch: () => new Error("unauthorized"),
+  })
+
+  const updated = yield* Effect.tryPromise({
+    try: () =>
+      db
+        .update(employees)
+        .set({
+          name,
+          updatedAt: new Date(),
+        })
+        .where(eq(employees.userId, claims.sub))
+        .returning(),
+    catch: () => new Error("failed to update profile"),
+  })
+
+  const employee = updated[0]
+  if (!employee) {
+    return yield* json({ error: "employee not found" }, 404)
+  }
+
+  return yield* json({ name: employee.name })
+}).pipe(
+  Effect.catchAll((error) =>
+    json(
+      { error: error.message },
+      error.message === "unauthorized" ? 401 : 400,
+    )
+  ),
+)
+
 export const MeGroupLive = HttpRouter.empty.pipe(
   HttpRouter.get("/me", getMe),
+  HttpRouter.put("/me/profile", updateProfile),
 )

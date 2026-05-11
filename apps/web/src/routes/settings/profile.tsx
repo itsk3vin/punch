@@ -1,61 +1,113 @@
-import { useRef } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { useEmployee } from "@/hooks/use-employee";
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+
+type ProfileFormValues = {
+  name: string;
+};
+
+function getInitials(name: string | undefined) {
+  const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
+  const firstInitial = parts[0]?.charAt(0) ?? "";
+  const lastInitial = parts.length > 1 ? parts[parts.length - 1]?.charAt(0) : "";
+  const initials = `${firstInitial}${lastInitial}`.toUpperCase();
+
+  return initials || "?";
+}
 
 export function SettingsProfileRoute() {
-  const { user } = useAuth0();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { getAccessTokenSilently, user } = useAuth0();
+  const { employee } = useEmployee();
+  const [isSaved, setIsSaved] = useState(false);
+  const {
+    handleSubmit,
+    register,
+    setError,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<ProfileFormValues>({
+    values: {
+      name: employee?.name ?? "",
+    },
+  });
+  const name = watch("name");
+
+  async function onSubmit(values: ProfileFormValues) {
+    setIsSaved(false);
+    const accessToken = await getAccessTokenSilently();
+    const response = await fetch(`${apiBaseUrl}/api/v1/me/profile`, {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: values.name,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      setError("root", {
+        message: body?.error ?? "Could not update your profile.",
+      });
+      return;
+    }
+
+    setIsSaved(true);
+  }
 
   return (
     <section className="max-w-[600px] w-[600px] mx-auto">
       <div className="flex flex-col gap-6">
         <h1 className="text-xl font-semibold tracking-tight">Profile</h1>
 
-        <div className="rounded-xl border bg-card text-sm">
+        <form
+          className="rounded-xl border bg-card text-sm"
+          onSubmit={handleSubmit(onSubmit)}
+        >
           {/* Profile picture */}
           <div className="flex items-center justify-between px-5 py-4">
             <div>
               <p className="font-medium">Profile picture</p>
               <p className="text-muted-foreground text-xs mt-0.5">
-                Recommended size is 256×256px
+                Generated from your first and last name.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-lg overflow-hidden ring-offset-background transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <Avatar className="size-10 rounded-lg">
-                <AvatarImage
-                  src={user?.picture ?? undefined}
-                  alt={user?.name ?? "User"}
-                />
-                <AvatarFallback className="rounded-lg text-sm font-medium">
-                  {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
-                </AvatarFallback>
-              </Avatar>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-            />
+            <Avatar className="size-10 rounded-lg">
+              <AvatarFallback className="rounded-lg text-sm font-medium">
+                {getInitials(name)}
+              </AvatarFallback>
+            </Avatar>
           </div>
 
           <Separator />
 
-          {/* Full name */}
           <div className="flex items-center justify-between px-5 py-4">
             <p className="font-medium">Full name</p>
-            <Input
-              className="w-[280px]"
-              defaultValue={user?.name ?? ""}
-              placeholder="Your name"
-            />
+            <div className="w-[280px]">
+              <Input
+                placeholder="Your name"
+                {...register("name", {
+                  required: "Name is required",
+                  validate: (value) =>
+                    value.trim().length > 0 || "Name is required",
+                })}
+              />
+              {errors.name && (
+                <p className="mt-2 text-xs text-destructive">
+                  {errors.name.message}
+                </p>
+              )}
+            </div>
           </div>
 
           <Separator />
@@ -70,7 +122,23 @@ export function SettingsProfileRoute() {
               disabled
             />
           </div>
-        </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between px-5 py-4">
+            <div>
+              {errors.root && (
+                <p className="text-xs text-destructive">{errors.root.message}</p>
+              )}
+              {isSaved && !errors.root && (
+                <p className="text-xs text-muted-foreground">Profile updated.</p>
+              )}
+            </div>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save changes"}
+            </Button>
+          </div>
+        </form>
       </div>
     </section>
   );
