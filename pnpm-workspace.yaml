@@ -1,3 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Minutes after publish before a version may be installed (4320 = 3 days).
+minimumReleaseAge: 4320
