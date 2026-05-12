@@ -76,7 +76,14 @@ export function useEmployee() {
         });
 
         if (!response.ok) {
-          throw new Error("failed to load employee");
+          const body = (await response.json().catch(() => null)) as {
+            error?: unknown;
+          } | null;
+          const detail =
+            body?.error != null && String(body.error).length > 0
+              ? String(body.error)
+              : `${response.status} ${response.statusText}`;
+          throw new Error(detail);
         }
 
         setData((await response.json()) as MeResponse);

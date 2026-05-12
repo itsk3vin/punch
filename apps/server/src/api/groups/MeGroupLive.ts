@@ -20,6 +20,18 @@ import {
 import { getSignedAssetReadUrl } from "../../r2.js"
 import { json } from "../response.js"
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.length > 0) {
+    return error.message
+  }
+  return typeof error === "string" ? error : JSON.stringify(error)
+}
+
+const wrapDbError =
+  (label: string) =>
+  (error: unknown): Error =>
+    new Error(`${label}: ${errorMessage(error)}`)
+
 const EmployeeResponse = Schema.Struct({
   id: Schema.String,
   userId: Schema.String,
@@ -98,7 +110,7 @@ const getMe = Effect.gen(function* () {
         .from(employees)
         .where(eq(employees.userId, claims.sub))
         .limit(1),
-    catch: () => new Error("failed to get employee"),
+    catch: wrapDbError("failed to get employee"),
   })
 
   const employee = employeeResults[0]
@@ -111,7 +123,7 @@ const getMe = Effect.gen(function* () {
           .from(organizations)
           .where(eq(organizations.id, organizationId))
           .limit(1),
-      catch: () => new Error("failed to get organization"),
+      catch: wrapDbError("failed to get organization"),
     })
     const organization = organizationResults[0]
 
@@ -170,7 +182,7 @@ const getMe = Effect.gen(function* () {
           isNull(invitations.acceptedAt),
           isNull(invitations.rejectedAt),
         )),
-    catch: () => new Error("failed to get invitations"),
+    catch: wrapDbError("failed to get invitations"),
   })
 
   if (pendingInvitations.length > 0) {
@@ -192,9 +204,19 @@ const getMe = Effect.gen(function* () {
     email,
   } satisfies MeResponse)
 }).pipe(
-  Effect.catchAll((error) =>
-    json({ error: error.message }, error.message === "unauthorized" ? 401 : 400)
-  ),
+  Effect.catchAll((error) => {
+    const msg = errorMessage(error)
+    if (msg !== "unauthorized") {
+      console.error("[GET /api/v1/me]", msg)
+    }
+    const isUnauthorized = msg === "unauthorized"
+    const isDbOrInfra =
+      msg.startsWith("failed to get employee:") ||
+      msg.startsWith("failed to get organization:") ||
+      msg.startsWith("failed to get invitations:")
+    const status = isUnauthorized ? 401 : isDbOrInfra ? 500 : 400
+    return json({ error: msg }, status)
+  }),
 )
 
 const updateProfile = Effect.gen(function* () {

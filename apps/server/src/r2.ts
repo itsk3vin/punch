@@ -80,4 +80,7 @@ export const getSignedAssetReadUrl = (key: string | null) =>
         }),
       catch: () => new Error("failed to create asset url"),
     })
-  })
+  }).pipe(
+    // R2 often unset locally; signing can also fail transiently. Never block /me on logos.
+    Effect.catchAll(() => Effect.succeed(null)),
+  )
