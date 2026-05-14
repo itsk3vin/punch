@@ -7,6 +7,8 @@ type Employee = {
   id: string;
   userId: string;
   organizationId: string;
+  locationId: string | null;
+  departmentId: string | null;
   email: string;
   name: string;
   role: string;
@@ -27,11 +29,17 @@ type InvitationSummary = {
   email: string;
 };
 
+export type MeScopePayload =
+  | { type: "location_group"; id: string; name: string }
+  | { type: "location"; id: string; name: string }
+  | { type: "department"; id: string; name: string };
+
 export type MeResponse =
   | {
       status: "ready";
       employee: Employee;
       organization: Organization;
+      scopes: MeScopePayload[];
     }
   | {
       status: "has_invitations";

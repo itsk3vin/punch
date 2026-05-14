@@ -11,6 +11,7 @@ import {
 import { Effect, Schema } from "effect"
 
 import { verifyBearerToken } from "../../auth.js"
+import { fetchEmployeeScopesForMe } from "../middleware/organization.js"
 import { db } from "../../db/index.js"
 import {
   employees,
@@ -36,10 +37,30 @@ const EmployeeResponse = Schema.Struct({
   id: Schema.String,
   userId: Schema.String,
   organizationId: Schema.String,
+  locationId: Schema.NullOr(Schema.String),
+  departmentId: Schema.NullOr(Schema.String),
   email: Schema.String,
   name: Schema.String,
   role: Schema.String,
 })
+
+const MeScopeItem = Schema.Union(
+  Schema.Struct({
+    type: Schema.Literal("location_group"),
+    id: Schema.String,
+    name: Schema.String,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("location"),
+    id: Schema.String,
+    name: Schema.String,
+  }),
+  Schema.Struct({
+    type: Schema.Literal("department"),
+    id: Schema.String,
+    name: Schema.String,
+  }),
+)
 
 const OrganizationResponse = Schema.Struct({
   id: Schema.String,
@@ -65,6 +86,7 @@ const MeResponse = Schema.Union(
     status: Schema.Literal("ready"),
     employee: EmployeeResponse,
     organization: OrganizationResponse,
+    scopes: Schema.Array(MeScopeItem),
   }),
   Schema.Struct({
     status: Schema.Literal("has_invitations"),
@@ -130,12 +152,19 @@ const getMe = Effect.gen(function* () {
     if (organization) {
       const logoUrl = yield* getSignedAssetReadUrl(organization.logoUrl)
 
+      const scopes = yield* Effect.tryPromise({
+        try: () => fetchEmployeeScopesForMe(employee.id),
+        catch: wrapDbError("failed to get manager scopes"),
+      })
+
       return yield* json({
         status: "ready",
         employee: {
           id: employee.id,
           userId: employee.userId ?? "",
           organizationId: employee.organizationId,
+          locationId: employee.locationId ?? null,
+          departmentId: employee.departmentId ?? null,
           email: employee.email,
           name: employee.name,
           role: employee.role,
@@ -146,6 +175,7 @@ const getMe = Effect.gen(function* () {
           slug: organization.slug,
           logoUrl,
         },
+        scopes,
       } satisfies MeResponse)
     }
   }
@@ -213,7 +243,8 @@ const getMe = Effect.gen(function* () {
     const isDbOrInfra =
       msg.startsWith("failed to get employee:") ||
       msg.startsWith("failed to get organization:") ||
-      msg.startsWith("failed to get invitations:")
+      msg.startsWith("failed to get invitations:") ||
+      msg.startsWith("failed to get manager scopes:")
     const status = isUnauthorized ? 401 : isDbOrInfra ? 500 : 400
     return json({ error: msg }, status)
   }),
