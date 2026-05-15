@@ -4,6 +4,9 @@ import {
   IconCalendar,
   IconCreditCard,
   IconFileImport,
+  IconMap2,
+  IconMapPin,
+  IconSitemap,
   IconUser,
   IconUsers,
 } from "@tabler/icons-react";
@@ -22,6 +25,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
+import { useEmployee } from "@/hooks/use-employee";
 
 interface NavItem {
   to: string;
@@ -37,27 +41,53 @@ interface NavGroup {
 export function SettingsLayout() {
   const { orgname } = useParams();
   const location = useLocation();
+  const { employee } = useEmployee();
   const currentPath = location.pathname.replace(/\/$/, "");
   const base = `/${orgname ?? ""}/settings`;
   const organizationPath = `/${orgname ?? ""}`;
+  const role = employee?.role;
+  const isAdmin = role === "admin";
+  const isManager = role === "manager";
+  const canManageOrgRoster = isAdmin || isManager;
 
-  const groups: NavGroup[] = [
-    {
-      items: [
-        { to: `${base}/profile`, label: "Profile", icon: IconUser },
-        { to: `${base}/availability`, label: "Availability", icon: IconCalendar },
-      ],
-    },
-    {
-      label: "Administration",
-      items: [
-        { to: `${base}/company-profile`, label: "Company profile", icon: IconBuilding },
-        { to: `${base}/members`, label: "Members", icon: IconUsers },
-        { to: `${base}/billing`, label: "Billing", icon: IconCreditCard },
-        { to: `${base}/import`, label: "Import", icon: IconFileImport },
-      ],
-    },
+  const personalItems: NavItem[] = [
+    { to: `${base}/profile`, label: "Profile", icon: IconUser },
+    { to: `${base}/availability`, label: "Availability", icon: IconCalendar },
   ];
+
+  const administrationItems: NavItem[] = [];
+  if (isAdmin) {
+    administrationItems.push({
+      to: `${base}/company-profile`,
+      label: "Company profile",
+      icon: IconBuilding,
+    });
+  }
+  if (canManageOrgRoster) {
+    administrationItems.push(
+      { to: `${base}/members`, label: "Members", icon: IconUsers },
+      { to: `${base}/locations`, label: "Locations", icon: IconMapPin },
+      { to: `${base}/departments`, label: "Departments", icon: IconSitemap },
+    );
+  }
+  if (isAdmin) {
+    administrationItems.push(
+      { to: `${base}/location-groups`, label: "Location groups", icon: IconMap2 },
+      { to: `${base}/billing`, label: "Billing", icon: IconCreditCard },
+    );
+  }
+  if (canManageOrgRoster) {
+    administrationItems.push({
+      to: `${base}/import`,
+      label: "Import",
+      icon: IconFileImport,
+    });
+  }
+
+  const groups: NavGroup[] = [{ items: personalItems }];
+  if (administrationItems.length > 0) {
+    groups.push({ label: "Administration", items: administrationItems });
+  }
 
   return (
     <SidebarProvider>

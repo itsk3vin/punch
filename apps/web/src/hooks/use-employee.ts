@@ -125,6 +125,7 @@ export function useEmployee() {
     data,
     employee: data?.status === "ready" ? data.employee : null,
     organization: data?.status === "ready" ? data.organization : null,
+    scopes: data?.status === "ready" ? data.scopes : [],
     error,
     isLoading: isLoading || isFetching || (isAuthenticated && !hasFetched),
   };

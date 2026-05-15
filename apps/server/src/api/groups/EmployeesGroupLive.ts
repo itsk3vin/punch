@@ -2,16 +2,21 @@ import {
   HttpRouter,
   HttpServerRequest,
 } from "@effect/platform"
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { Effect, Schema } from "effect"
 
 import { db } from "../../db/index.js"
-import { employees } from "../../db/schema.js"
+import { departments, employees, locations } from "../../db/schema.js"
 import {
   handleAuthorizationError,
   requireOrganizationAccess,
   requireOrganizationAdmin,
 } from "../middleware/organization.js"
+import {
+  buildDepartmentParentMap,
+  coworkerMatchesVisibility,
+  getOrganizationalVisibility,
+} from "../middleware/resourceScope.js"
 import { json } from "../response.js"
 
 const CreateEmployeeBody = Schema.Struct({
@@ -27,6 +32,8 @@ const AdminUpdateEmployeeBody = Schema.Struct({
   email: Schema.optional(Schema.String),
   name: Schema.optional(Schema.String),
   role: Schema.optional(Schema.String),
+  locationId: Schema.optional(Schema.Union(Schema.Null, Schema.String)),
+  departmentId: Schema.optional(Schema.Union(Schema.Null, Schema.String)),
 })
 
 const RemoveEmployeeBody = Schema.Struct({
@@ -97,7 +104,14 @@ const updateEmployee = Effect.gen(function* () {
   const body = yield* parseJsonBody(AdminUpdateEmployeeBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
   )
-  const { id, name, email, role } = body
+  const {
+    id,
+    name,
+    email,
+    role,
+    locationId: nextLocationId,
+    departmentId: nextDepartmentId,
+  } = body
 
   const existingRows = yield* Effect.tryPromise({
     try: () =>
@@ -118,7 +132,9 @@ const updateEmployee = Effect.gen(function* () {
     return yield* json({ error: "forbidden" }, 403)
   }
 
-  const authorized = yield* requireOrganizationAdmin(target.organizationId).pipe(
+  const organizationId = target.organizationId
+
+  const authorized = yield* requireOrganizationAdmin(organizationId).pipe(
     Effect.either,
   )
   if (authorized._tag === "Left") {
@@ -129,6 +145,8 @@ const updateEmployee = Effect.gen(function* () {
     name?: string
     email?: string
     role?: string
+    locationId?: string | null
+    departmentId?: string | null
     updatedAt: Date
   } = { updatedAt: new Date() }
 
@@ -150,6 +168,91 @@ const updateEmployee = Effect.gen(function* () {
 
   if (role !== undefined) {
     updates.role = role
+  }
+
+  /** Effective FK targets after PATCH for validation (explicit or unchanged). */
+  let effectiveLocationId = target.locationId
+
+  if (nextLocationId !== undefined) {
+    if (nextLocationId === null) {
+      updates.locationId = null
+      effectiveLocationId = null
+    }
+    else {
+      const row = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ id: locations.id })
+            .from(locations)
+            .where(and(
+              eq(locations.id, nextLocationId),
+              eq(locations.organizationId, organizationId),
+            ))
+            .limit(1),
+        catch: () => new Error("failed to validate location"),
+      })
+      if (!row[0]) {
+        return yield* json({ error: "location not found" }, 400)
+      }
+      updates.locationId = row[0].id
+      effectiveLocationId = row[0].id
+    }
+  }
+
+  if (nextDepartmentId !== undefined) {
+    if (nextDepartmentId === null) {
+      updates.departmentId = null
+    }
+    else {
+      const dRow = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({
+              deptId: departments.id,
+              locId: departments.locationId,
+            })
+            .from(departments)
+            .innerJoin(locations, eq(departments.locationId, locations.id))
+            .where(and(
+              eq(departments.id, nextDepartmentId),
+              eq(locations.organizationId, organizationId),
+            ))
+            .limit(1),
+        catch: () => new Error("failed to validate department"),
+      })
+      const d = dRow[0]
+      if (!d) {
+        return yield* json({ error: "department not found" }, 400)
+      }
+      updates.departmentId = d.deptId
+      if (
+        effectiveLocationId !== null &&
+        effectiveLocationId !== undefined &&
+        d.locId !== effectiveLocationId
+      ) {
+        return yield* json({ error: "department not at employee location" }, 400)
+      }
+    }
+  }
+
+  /** If department was set/changed without location PATCH, dept implies parent location. */
+  if (
+    nextDepartmentId !== undefined &&
+    nextDepartmentId !== null &&
+    effectiveLocationId === null
+  ) {
+    const deptLoc = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ locationId: departments.locationId })
+          .from(departments)
+          .where(and(
+            eq(departments.id, nextDepartmentId),
+          ))
+          .limit(1),
+      catch: () => new Error("failed to resolve department"),
+    })
+    updates.locationId = deptLoc[0]?.locationId ?? null
   }
 
   if (Object.keys(updates).length === 1) {
@@ -229,6 +332,12 @@ const getAllEmployeesByOrganizationId = Effect.gen(function* () {
     return yield* handleAuthorizationError(authorized.left)
   }
 
+  const viewer = authorized.right
+  const visibility = yield* Effect.tryPromise({
+    try: () => getOrganizationalVisibility(viewer, organizationId),
+    catch: () => new Error("failed to resolve visibility"),
+  })
+
   const results = yield* Effect.tryPromise({
     try: () =>
       db
@@ -238,7 +347,21 @@ const getAllEmployeesByOrganizationId = Effect.gen(function* () {
     catch: () => new Error("failed to list employees"),
   })
 
-  return yield* json(results)
+  if (visibility.kind === "all") {
+    return yield* json(results)
+  }
+
+  const parentMap = yield* Effect.tryPromise({
+    try: () =>
+      buildDepartmentParentMap(results.map((e) => e.departmentId)),
+    catch: () => new Error("failed to resolve department parents"),
+  })
+
+  const filtered = results.filter((row) =>
+    coworkerMatchesVisibility(visibility, row, parentMap),
+  )
+
+  return yield* json(filtered)
 })
 
 export const EmployeesGroupLive = HttpRouter.empty.pipe(

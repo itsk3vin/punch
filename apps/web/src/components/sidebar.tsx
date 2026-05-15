@@ -48,7 +48,7 @@ function getOrganizationInitials(name?: string) {
 
 export function Sidebar() {
   const { logout } = useAuth0();
-  const { organization } = useEmployee();
+  const { employee, organization } = useEmployee();
   const location = useLocation();
   const { orgname } = useParams();
   const organizationName = organization?.name ?? "Punch";
@@ -101,11 +101,13 @@ export function Sidebar() {
                 Settings
               </NavLink>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <NavLink to={`${organizationPath}/settings/members`}>
-                Invite and manage members
-              </NavLink>
-            </DropdownMenuItem>
+            {(employee?.role === "admin" || employee?.role === "manager") && (
+              <DropdownMenuItem asChild>
+                <NavLink to={`${organizationPath}/settings/members`}>
+                  Invite and manage members
+                </NavLink>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() =>

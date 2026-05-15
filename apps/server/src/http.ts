@@ -9,6 +9,7 @@ import {
   InvitationsGroupLive,
   MeGroupLive,
   OrganizationGroupLive,
+  ScopedResourcesGroupLive,
 } from "./api/groups/index.js"
 import { json } from "./api/response.js"
 
@@ -27,4 +28,5 @@ export const app = HttpRouter.empty.pipe(
   HttpRouter.mount("/api/v1", InvitationsGroupLive),
   HttpRouter.mount("/api/v1", MeGroupLive),
   HttpRouter.mount("/api/v1", OrganizationGroupLive),
+  HttpRouter.mount("/api/v1", ScopedResourcesGroupLive),
 )

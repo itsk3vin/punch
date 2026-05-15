@@ -10,7 +10,10 @@ import { SettingsRoute } from "./routes/settings";
 import { SettingsAvailabilityRoute } from "./routes/settings/availability";
 import { SettingsBillingRoute } from "./routes/settings/billing";
 import { SettingsCompanyProfileRoute } from "./routes/settings/company-profile";
+import { SettingsDepartmentsRoute } from "./routes/settings/departments";
 import { SettingsImportRoute } from "./routes/settings/import";
+import { SettingsLocationGroupsRoute } from "./routes/settings/location-groups";
+import { SettingsLocationsRoute } from "./routes/settings/locations";
 import { SettingsLayout } from "./routes/settings/settings-layout";
 import { SettingsMembersRoute } from "./routes/settings/members";
 import { SettingsProfileRoute } from "./routes/settings/profile";
@@ -87,6 +90,18 @@ export const router = createBrowserRouter([
       {
         path: "members",
         element: <SettingsMembersRoute />,
+      },
+      {
+        path: "locations",
+        element: <SettingsLocationsRoute />,
+      },
+      {
+        path: "departments",
+        element: <SettingsDepartmentsRoute />,
+      },
+      {
+        path: "location-groups",
+        element: <SettingsLocationGroupsRoute />,
       },
       {
         path: "billing",

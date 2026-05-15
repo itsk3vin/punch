@@ -1,7 +1,7 @@
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router";
+import { Navigate, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { LogoUploadDialog } from "@/components/logo-upload-dialog";
@@ -40,7 +40,8 @@ const slugify = (value: string) =>
 
 export function SettingsCompanyProfileRoute() {
   const { getAccessTokenSilently } = useAuth0();
-  const { employee, organization } = useEmployee();
+  const { orgname } = useParams();
+  const { employee, organization, isLoading } = useEmployee();
   const navigate = useNavigate();
   const [logo, setLogo] = useState<{ blob: Blob; previewUrl: string } | null>(
     null,
@@ -160,6 +161,18 @@ export function SettingsCompanyProfileRoute() {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="text-sm text-muted-foreground">
+        Loading company profile…
+      </div>
+    );
+  }
+
+  if (!employee || employee.role !== "admin") {
+    return <Navigate to={`/${orgname ?? ""}/settings/profile`} replace />;
+  }
+
   return (
     <section className="max-w-[600px] w-[600px] mx-auto">
       <div className="flex flex-col gap-6">
@@ -168,12 +181,6 @@ export function SettingsCompanyProfileRoute() {
             Company profile
           </h1>
         </div>
-
-        {!isAdmin && (
-          <p className="rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-            Only organization admins can update company settings.
-          </p>
-        )}
 
         <form
           className="rounded-xl border bg-card text-sm"
