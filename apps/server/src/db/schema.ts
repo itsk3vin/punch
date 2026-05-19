@@ -21,6 +21,9 @@ export const locations = pgTable("locations", {
     .notNull()
     .references(() => organizations.id),
   name: text("name").notNull(),
+  address: text("address").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })

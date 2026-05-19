@@ -936,7 +936,7 @@ export function SettingsMembersRoute() {
     <section className="w-full max-w-full">
       <div className="flex flex-col gap-6">
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="flex flex-col mx-4">
             <h1 className="text-xl font-medium tracking-tight">Members</h1>
             {isManager && !isAdmin && (
               <p className="mt-1 text-sm text-muted-foreground">
@@ -1047,7 +1047,7 @@ export function SettingsMembersRoute() {
                               {formatRole(member.role)}
                             </span>
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-xs">
+                          <TableCell className="text-muted-foreground text-sm">
                             {worksite ?? "—"}
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">
@@ -1193,7 +1193,7 @@ export function SettingsMembersRoute() {
                                 {formatRole(invitation.role)} (Invited)
                               </span>
                             </TableCell>
-                            <TableCell className="text-muted-foreground text-xs">
+                            <TableCell className="text-muted-foreground text-md">
                               {invScope ?? "—"}
                             </TableCell>
                             <TableCell className="text-right text-muted-foreground">

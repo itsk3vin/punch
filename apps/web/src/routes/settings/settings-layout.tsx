@@ -4,9 +4,7 @@ import {
   IconCalendar,
   IconCreditCard,
   IconFileImport,
-  IconMap2,
   IconMapPin,
-  IconSitemap,
   IconUser,
   IconUsers,
 } from "@tabler/icons-react";
@@ -67,12 +65,10 @@ export function SettingsLayout() {
     administrationItems.push(
       { to: `${base}/members`, label: "Members", icon: IconUsers },
       { to: `${base}/locations`, label: "Locations", icon: IconMapPin },
-      { to: `${base}/departments`, label: "Departments", icon: IconSitemap },
     );
   }
   if (isAdmin) {
     administrationItems.push(
-      { to: `${base}/location-groups`, label: "Location groups", icon: IconMap2 },
       { to: `${base}/billing`, label: "Billing", icon: IconCreditCard },
     );
   }
@@ -130,7 +126,7 @@ export function SettingsLayout() {
         </SidebarContent>
       </Sidebar>
 
-      <SidebarInset className="overflow-y-auto px-10 py-10">
+      <SidebarInset className="overflow-y-auto py-10">
         <Outlet />
       </SidebarInset>
     </SidebarProvider>

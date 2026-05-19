@@ -1,8 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm"
-import { HttpRouter, HttpServerRequest } from "@effect/platform"
-import { Effect, Schema } from "effect"
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { HttpRouter, HttpServerRequest } from "@effect/platform";
+import { Effect, Schema } from "effect";
 
-import { db } from "../../db/index.js"
+import { db } from "../../db/index.js";
 import {
   departments,
   employees,
@@ -10,7 +10,7 @@ import {
   locationGroups,
   locations,
   managerScopes,
-} from "../../db/schema.js"
+} from "../../db/schema.js";
 import {
   handleAuthorizationError,
   requireDepartmentAccess,
@@ -18,43 +18,48 @@ import {
   requireManagerOrAdmin,
   requireOrganizationAccess,
   requireOrganizationAdmin,
-} from "../middleware/organization.js"
-import type { OrganizationalVisibility } from "../middleware/resourceScope.js"
+} from "../middleware/organization.js";
+import type { OrganizationalVisibility } from "../middleware/resourceScope.js";
 import {
   departmentMatchesVisibility,
   getOrganizationalVisibility,
   rollupParentLocationsFromDepartmentScopes,
-} from "../middleware/resourceScope.js"
-import { json } from "../response.js"
+} from "../middleware/resourceScope.js";
+import { json } from "../response.js";
 
 const OrgParams = Schema.Struct({
   id: Schema.String,
-})
+});
 
 const OrgLocationParams = Schema.Struct({
   id: Schema.String,
   locationId: Schema.String,
-})
+});
+
+const OrgLocationNameParams = Schema.Struct({
+  id: Schema.String,
+  locationName: Schema.String,
+});
 
 const OrgDeptParams = Schema.Struct({
   id: Schema.String,
   departmentId: Schema.String,
-})
+});
 
 const OrgGroupParams = Schema.Struct({
   id: Schema.String,
   groupId: Schema.String,
-})
+});
 
 const OrgEmpScopeParams = Schema.Struct({
   id: Schema.String,
   employeeId: Schema.String,
-})
+});
 
 const OrgScopeRecordParams = Schema.Struct({
   id: Schema.String,
   recordId: Schema.String,
-})
+});
 
 const ManagerScopeMutationBody = Schema.Struct({
   employeeId: Schema.String,
@@ -64,39 +69,45 @@ const ManagerScopeMutationBody = Schema.Struct({
     Schema.Literal("department"),
   ),
   scopeId: Schema.String,
-})
+});
 
 const LocationCreateBody = Schema.Struct({
   name: Schema.String,
-})
+  address: Schema.String,
+  city: Schema.String,
+  state: Schema.String,
+});
 
 const LocationUpdateBody = Schema.Struct({
   name: Schema.String,
-})
+  address: Schema.String,
+  city: Schema.String,
+  state: Schema.String,
+});
 
 const DepartmentCreateBody = Schema.Struct({
   locationId: Schema.String,
   name: Schema.String,
-})
+});
 
 const DepartmentUpdateBody = Schema.Struct({
   name: Schema.String,
-})
+});
 
 const LocationGroupUpsertBody = Schema.Struct({
   name: Schema.String,
   locationIds: Schema.optional(Schema.Array(Schema.String)),
-})
+});
 
 const LocationGroupRenameBody = Schema.Struct({
   name: Schema.optional(Schema.String),
   locationIds: Schema.optional(Schema.Array(Schema.String)),
-})
+});
 
 const parseJsonBody = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
   HttpServerRequest.schemaBodyJson(schema).pipe(
     Effect.mapError(() => new Error("invalid request body")),
-  )
+  );
 
 async function assertScopeBelongsToOrganization(
   organizationId: string,
@@ -107,36 +118,42 @@ async function assertScopeBelongsToOrganization(
     const rows = await db
       .select({ id: locationGroups.id })
       .from(locationGroups)
-      .where(and(
-        eq(locationGroups.id, scopeId),
-        eq(locationGroups.organizationId, organizationId),
-      ))
-      .limit(1)
-    return rows.length > 0
+      .where(
+        and(
+          eq(locationGroups.id, scopeId),
+          eq(locationGroups.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
   }
 
   if (scopeType === "location") {
     const rows = await db
       .select({ id: locations.id })
       .from(locations)
-      .where(and(
-        eq(locations.id, scopeId),
-        eq(locations.organizationId, organizationId),
-      ))
-      .limit(1)
-    return rows.length > 0
+      .where(
+        and(
+          eq(locations.id, scopeId),
+          eq(locations.organizationId, organizationId),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
   }
 
   const rows = await db
     .select({ departmentId: departments.id })
     .from(departments)
     .innerJoin(locations, eq(departments.locationId, locations.id))
-    .where(and(
-      eq(departments.id, scopeId),
-      eq(locations.organizationId, organizationId),
-    ))
-    .limit(1)
-  return rows.length > 0
+    .where(
+      and(
+        eq(departments.id, scopeId),
+        eq(locations.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
 }
 
 async function filterLocationGroupsForVisibility(
@@ -147,24 +164,27 @@ async function filterLocationGroupsForVisibility(
   const allGroups = await db
     .select()
     .from(locationGroups)
-    .where(eq(locationGroups.organizationId, organizationId))
+    .where(eq(locationGroups.organizationId, organizationId));
 
   if (visibility.kind === "all") {
-    return allGroups
+    return allGroups;
   }
 
-  const breadth = visibility.wholeBreadthLocationIds
-  const deptRollup = await rollupParentLocationsFromDepartmentScopes(visibility)
-  const rollupLocations = new Set([...breadth, ...deptRollup])
+  const breadth = visibility.wholeBreadthLocationIds;
+  const deptRollup =
+    await rollupParentLocationsFromDepartmentScopes(visibility);
+  const rollupLocations = new Set([...breadth, ...deptRollup]);
 
   const directGroupScopes = await db
     .select({ scopeId: managerScopes.scopeId })
     .from(managerScopes)
-    .where(and(
-      eq(managerScopes.employeeId, viewer.id),
-      eq(managerScopes.scopeType, "location_group"),
-    ))
-  const scopedGroupIds = new Set(directGroupScopes.map((r) => r.scopeId))
+    .where(
+      and(
+        eq(managerScopes.employeeId, viewer.id),
+        eq(managerScopes.scopeType, "location_group"),
+      ),
+    );
+  const scopedGroupIds = new Set(directGroupScopes.map((r) => r.scopeId));
 
   const junctions = await db
     .select({
@@ -176,35 +196,35 @@ async function filterLocationGroupsForVisibility(
       locationGroups,
       eq(locationGroupLocations.locationGroupId, locationGroups.id),
     )
-    .where(eq(locationGroups.organizationId, organizationId))
+    .where(eq(locationGroups.organizationId, organizationId));
 
-  const visibleGroupIds = new Set<string>()
+  const visibleGroupIds = new Set<string>();
   for (const j of junctions) {
     if (!rollupLocations.has(j.locationId)) {
-      continue
+      continue;
     }
-    visibleGroupIds.add(j.groupId)
+    visibleGroupIds.add(j.groupId);
   }
 
   return allGroups.filter(
     (g) => scopedGroupIds.has(g.id) || visibleGroupIds.has(g.id),
-  )
+  );
 }
 
 const listLocations = Effect.gen(function* () {
-  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams)
+  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
   const authorized = yield* requireOrganizationAccess(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (authorized._tag === "Left") {
-    return yield* handleAuthorizationError(authorized.left)
+    return yield* handleAuthorizationError(authorized.left);
   }
 
-  const viewer = authorized.right
+  const viewer = authorized.right;
   const visibility = yield* Effect.tryPromise({
     try: () => getOrganizationalVisibility(viewer, organizationId),
     catch: () => new Error("failed to resolve visibility"),
-  })
+  });
 
   let rows =
     visibility.kind === "all"
@@ -221,80 +241,243 @@ const listLocations = Effect.gen(function* () {
             const unionIds = [
               ...visibility.wholeBreadthLocationIds,
               ...(await rollupParentLocationsFromDepartmentScopes(visibility)),
-            ]
+            ];
             if (unionIds.length === 0) {
-              return [] as typeof locations.$inferSelect[]
+              return [] as (typeof locations.$inferSelect)[];
             }
             return db
               .select()
               .from(locations)
-              .where(and(
-                eq(locations.organizationId, organizationId),
-                inArray(locations.id, [...new Set(unionIds)]),
-              ))
+              .where(
+                and(
+                  eq(locations.organizationId, organizationId),
+                  inArray(locations.id, [...new Set(unionIds)]),
+                ),
+              );
           },
           catch: () => new Error("failed to list locations"),
-        })
+        });
 
-  rows.sort((first, second) => first.name.localeCompare(second.name))
-  return yield* json(rows)
+  if (rows.length === 0) {
+    return yield* json([]);
+  }
+
+  const locationIds = rows.map((r) => r.id);
+
+  const { counts, managers } = yield* Effect.all({
+    counts: Effect.tryPromise({
+      try: () =>
+        db
+          .select({
+            locationId: employees.locationId,
+            count: sql<number>`count(*)::int`.as("count"),
+          })
+          .from(employees)
+          .where(
+            and(
+              eq(employees.organizationId, organizationId),
+              inArray(employees.locationId, locationIds),
+            ),
+          )
+          .groupBy(employees.locationId),
+      catch: () => new Error("failed to load employee counts"),
+    }),
+    managers: Effect.tryPromise({
+      try: () =>
+        db
+          .select({
+            locationId: managerScopes.scopeId,
+            managerName: employees.name,
+          })
+          .from(managerScopes)
+          .innerJoin(employees, eq(managerScopes.employeeId, employees.id))
+          .where(
+            and(
+              eq(managerScopes.scopeType, "location"),
+              inArray(managerScopes.scopeId, locationIds),
+              eq(employees.organizationId, organizationId),
+            ),
+          ),
+      catch: () => new Error("failed to load managers"),
+    }),
+  });
+
+  const countById = new Map<string, number>(
+    counts.map((c) => [c.locationId ?? "", c.count]),
+  );
+  const managersById = new Map<string, string[]>();
+  for (const m of managers) {
+    const list = managersById.get(m.locationId) ?? [];
+    list.push(m.managerName);
+    managersById.set(m.locationId, list);
+  }
+
+  const enriched = rows.map((loc) => ({
+    ...loc,
+    employeeCount: countById.get(loc.id) ?? 0,
+    managers: managersById.get(loc.id) ?? [],
+  }));
+
+  enriched.sort((first, second) => first.name.localeCompare(second.name));
+  return yield* json(enriched);
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to list locations" }, 400),
   ),
-)
+);
+
+const getLocationByName = Effect.gen(function* () {
+  const { id: organizationId, locationName } =
+    yield* HttpRouter.schemaPathParams(OrgLocationNameParams);
+  const decodedLocationName = decodeURIComponent(locationName);
+
+  const locationRows = yield* Effect.tryPromise({
+    try: () =>
+      db
+        .select()
+        .from(locations)
+        .where(
+          and(
+            eq(locations.organizationId, organizationId),
+            eq(locations.name, decodedLocationName),
+          ),
+        )
+        .limit(1),
+    catch: () => new Error("failed to load location"),
+  });
+
+  const location = locationRows[0];
+  if (!location) {
+    return yield* json({ error: "location not found" }, 404);
+  }
+
+  const authorized = yield* requireLocationAccess(location.id).pipe(
+    Effect.either,
+  );
+  if (authorized._tag === "Left") {
+    return yield* handleAuthorizationError(authorized.left);
+  }
+
+  const { members, managers } = yield* Effect.all({
+    members: Effect.tryPromise({
+      try: () =>
+        db
+          .select({
+            id: employees.id,
+            name: employees.name,
+            email: employees.email,
+            role: employees.role,
+            createdAt: employees.createdAt,
+          })
+          .from(employees)
+          .where(
+            and(
+              eq(employees.organizationId, organizationId),
+              eq(employees.locationId, location.id),
+            ),
+          ),
+      catch: () => new Error("failed to load location members"),
+    }),
+    managers: Effect.tryPromise({
+      try: () =>
+        db
+          .select({
+            managerName: employees.name,
+          })
+          .from(managerScopes)
+          .innerJoin(employees, eq(managerScopes.employeeId, employees.id))
+          .where(
+            and(
+              eq(managerScopes.scopeType, "location"),
+              eq(managerScopes.scopeId, location.id),
+              eq(employees.organizationId, organizationId),
+            ),
+          ),
+      catch: () => new Error("failed to load managers"),
+    }),
+  });
+
+  const sortedMembers = [...members].sort((first, second) =>
+    first.name.localeCompare(second.name),
+  );
+
+  return yield* json({
+    ...location,
+    employeeCount: sortedMembers.length,
+    managers: managers.map((manager) => manager.managerName),
+    members: sortedMembers,
+  });
+}).pipe(
+  Effect.catchAll((error) =>
+    error instanceof Error
+      ? json({ error: error.message }, 400)
+      : json({ error: "failed to load location" }, 400),
+  ),
+);
 
 const createLocation = Effect.gen(function* () {
-  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams)
+  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
   const authorized = yield* requireManagerOrAdmin(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (authorized._tag === "Left") {
-    return yield* handleAuthorizationError(authorized.left)
+    return yield* handleAuthorizationError(authorized.left);
   }
 
   const body = yield* parseJsonBody(LocationCreateBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
-  )
-  const name = body.name.trim()
+  );
+  const name = body.name.trim();
   if (name === "") {
-    return yield* json({ error: "name is required" }, 400)
+    return yield* json({ error: "name is required" }, 400);
+  }
+  const address = body.address.trim();
+  if (address === "") {
+    return yield* json({ error: "address is required" }, 400);
+  }
+  const city = body.city.trim();
+  if (city === "") {
+    return yield* json({ error: "city is required" }, 400);
+  }
+  const state = body.state.trim();
+  if (state === "") {
+    return yield* json({ error: "state is required" }, 400);
   }
 
   const inserted = yield* Effect.tryPromise({
     try: () =>
       db
         .insert(locations)
-        .values({ organizationId, name })
+        .values({ organizationId, name, address, city, state })
         .returning(),
     catch: () => new Error("failed to create location"),
-  })
+  });
 
-  return yield* json(inserted[0], 201)
+  return yield* json(inserted[0], 201);
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to create location" }, 400),
   ),
-)
+);
 
 const updateLocation = Effect.gen(function* () {
   const { id: organizationId, locationId } =
-    yield* HttpRouter.schemaPathParams(OrgLocationParams)
+    yield* HttpRouter.schemaPathParams(OrgLocationParams);
 
   const orgOk = yield* requireOrganizationAccess(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (orgOk._tag === "Left") {
-    return yield* handleAuthorizationError(orgOk.left)
+    return yield* handleAuthorizationError(orgOk.left);
   }
 
-  const locAuth = yield* requireLocationAccess(locationId).pipe(Effect.either)
+  const locAuth = yield* requireLocationAccess(locationId).pipe(Effect.either);
   if (locAuth._tag === "Left") {
-    return yield* handleAuthorizationError(locAuth.left)
+    return yield* handleAuthorizationError(locAuth.left);
   }
 
   const locationRows = yield* Effect.tryPromise({
@@ -302,76 +485,89 @@ const updateLocation = Effect.gen(function* () {
       db
         .select()
         .from(locations)
-        .where(and(
-          eq(locations.id, locationId),
-          eq(locations.organizationId, organizationId),
-        ))
+        .where(
+          and(
+            eq(locations.id, locationId),
+            eq(locations.organizationId, organizationId),
+          ),
+        )
         .limit(1),
     catch: () => new Error("failed to validate location"),
-  })
+  });
 
-  const loc = locationRows[0]
+  const loc = locationRows[0];
   if (!loc) {
-    return yield* json({ error: "location not found" }, 404)
+    return yield* json({ error: "location not found" }, 404);
   }
 
   const body = yield* parseJsonBody(LocationUpdateBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
-  )
-  const name = body.name.trim()
+  );
+  const name = body.name.trim();
   if (name === "") {
-    return yield* json({ error: "name is required" }, 400)
+    return yield* json({ error: "name is required" }, 400);
+  }
+  const address = body.address.trim();
+  if (address === "") {
+    return yield* json({ error: "address is required" }, 400);
+  }
+  const city = body.city.trim();
+  if (city === "") {
+    return yield* json({ error: "city is required" }, 400);
+  }
+  const state = body.state.trim();
+  if (state === "") {
+    return yield* json({ error: "state is required" }, 400);
   }
 
   const updated = yield* Effect.tryPromise({
     try: () =>
       db
         .update(locations)
-        .set({ name, updatedAt: new Date() })
+        .set({ name, address, city, state, updatedAt: new Date() })
         .where(eq(locations.id, locationId))
         .returning(),
     catch: () => new Error("failed to update location"),
-  })
+  });
 
-  return yield* json(updated[0])
+  return yield* json(updated[0]);
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to update location" }, 400),
   ),
-)
+);
 
 const listDepartments = Effect.gen(function* () {
-  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams)
+  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
 
   const authorized = yield* requireOrganizationAccess(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (authorized._tag === "Left") {
-    return yield* handleAuthorizationError(authorized.left)
+    return yield* handleAuthorizationError(authorized.left);
   }
 
-  const viewer = authorized.right
+  const viewer = authorized.right;
   const visibility = yield* Effect.tryPromise({
     try: () => getOrganizationalVisibility(viewer, organizationId),
     catch: () => new Error("failed to resolve visibility"),
-  })
+  });
 
-  let rows
+  let rows;
   if (visibility.kind === "all") {
-    const joined =
-      yield* Effect.tryPromise({
-        try: () =>
-          db
-            .select({ department: departments })
-            .from(departments)
-            .innerJoin(locations, eq(departments.locationId, locations.id))
-            .where(eq(locations.organizationId, organizationId)),
-        catch: () => new Error("failed to list departments"),
-      })
+    const joined = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ department: departments })
+          .from(departments)
+          .innerJoin(locations, eq(departments.locationId, locations.id))
+          .where(eq(locations.organizationId, organizationId)),
+      catch: () => new Error("failed to list departments"),
+    });
 
-    rows = joined.map((entry) => entry.department)
+    rows = joined.map((entry) => entry.department);
   } else {
     rows = yield* Effect.tryPromise({
       try: async () => {
@@ -379,48 +575,48 @@ const listDepartments = Effect.gen(function* () {
           .select({ department: departments })
           .from(departments)
           .innerJoin(locations, eq(departments.locationId, locations.id))
-          .where(eq(locations.organizationId, organizationId))
+          .where(eq(locations.organizationId, organizationId));
         return base
           .filter((entry) =>
             departmentMatchesVisibility(visibility, entry.department),
           )
-          .map((entry) => entry.department)
+          .map((entry) => entry.department);
       },
       catch: () => new Error("failed to list departments"),
-    })
+    });
   }
 
   rows.sort((first, second) =>
     `${first.locationId}:${first.name}`.localeCompare(
       `${second.locationId}:${second.name}`,
     ),
-  )
-  return yield* json(rows)
+  );
+  return yield* json(rows);
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to list departments" }, 400),
   ),
-)
+);
 
 const createDepartment = Effect.gen(function* () {
-  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams)
+  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
 
   const body = yield* parseJsonBody(DepartmentCreateBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
-  )
-  const locationId = body.locationId
-  const name = body.name.trim()
+  );
+  const locationId = body.locationId;
+  const name = body.name.trim();
   if (name === "") {
-    return yield* json({ error: "name is required" }, 400)
+    return yield* json({ error: "name is required" }, 400);
   }
 
   const authorized = yield* requireLocationAccess(locationId).pipe(
     Effect.either,
-  )
+  );
   if (authorized._tag === "Left") {
-    return yield* handleAuthorizationError(authorized.left)
+    return yield* handleAuthorizationError(authorized.left);
   }
 
   const rows = yield* Effect.tryPromise({
@@ -428,52 +624,50 @@ const createDepartment = Effect.gen(function* () {
       db
         .select()
         .from(locations)
-        .where(and(
-          eq(locations.id, locationId),
-          eq(locations.organizationId, organizationId),
-        ))
+        .where(
+          and(
+            eq(locations.id, locationId),
+            eq(locations.organizationId, organizationId),
+          ),
+        )
         .limit(1),
     catch: () => new Error("failed to validate location"),
-  })
+  });
 
   if (!rows[0]) {
-    return yield* json({ error: "location not found" }, 404)
+    return yield* json({ error: "location not found" }, 404);
   }
 
   const inserted = yield* Effect.tryPromise({
-    try: () =>
-      db
-        .insert(departments)
-        .values({ locationId, name })
-        .returning(),
+    try: () => db.insert(departments).values({ locationId, name }).returning(),
     catch: () => new Error("failed to create department"),
-  })
+  });
 
-  return yield* json(inserted[0], 201)
+  return yield* json(inserted[0], 201);
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to create department" }, 400),
   ),
-)
+);
 
 const updateDepartment = Effect.gen(function* () {
   const { id: organizationId, departmentId } =
-    yield* HttpRouter.schemaPathParams(OrgDeptParams)
+    yield* HttpRouter.schemaPathParams(OrgDeptParams);
 
   const orgOk = yield* requireOrganizationAccess(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (orgOk._tag === "Left") {
-    return yield* handleAuthorizationError(orgOk.left)
+    return yield* handleAuthorizationError(orgOk.left);
   }
 
   const depAuth = yield* requireDepartmentAccess(departmentId).pipe(
     Effect.either,
-  )
+  );
   if (depAuth._tag === "Left") {
-    return yield* handleAuthorizationError(depAuth.left)
+    return yield* handleAuthorizationError(depAuth.left);
   }
 
   const existing = yield* Effect.tryPromise({
@@ -482,25 +676,27 @@ const updateDepartment = Effect.gen(function* () {
         .select({ department: departments })
         .from(departments)
         .innerJoin(locations, eq(departments.locationId, locations.id))
-        .where(and(
-          eq(departments.id, departmentId),
-          eq(locations.organizationId, organizationId),
-        ))
+        .where(
+          and(
+            eq(departments.id, departmentId),
+            eq(locations.organizationId, organizationId),
+          ),
+        )
         .limit(1),
     catch: () => new Error("failed to validate department"),
-  })
+  });
 
-  const row = existing[0]?.department
+  const row = existing[0]?.department;
   if (!row) {
-    return yield* json({ error: "department not found" }, 404)
+    return yield* json({ error: "department not found" }, 404);
   }
 
   const body = yield* parseJsonBody(DepartmentUpdateBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
-  )
-  const name = body.name.trim()
+  );
+  const name = body.name.trim();
   if (name === "") {
-    return yield* json({ error: "name is required" }, 400)
+    return yield* json({ error: "name is required" }, 400);
   }
 
   const updated = yield* Effect.tryPromise({
@@ -511,68 +707,68 @@ const updateDepartment = Effect.gen(function* () {
         .where(eq(departments.id, departmentId))
         .returning(),
     catch: () => new Error("failed to update department"),
-  })
+  });
 
-  return yield* json(updated[0])
+  return yield* json(updated[0]);
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to update department" }, 400),
   ),
-)
+);
 
 const listLocationGroups = Effect.gen(function* () {
-  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams)
+  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
 
   const authorized = yield* requireOrganizationAccess(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (authorized._tag === "Left") {
-    return yield* handleAuthorizationError(authorized.left)
+    return yield* handleAuthorizationError(authorized.left);
   }
 
-  const viewer = authorized.right
+  const viewer = authorized.right;
   const visibility = yield* Effect.tryPromise({
     try: () => getOrganizationalVisibility(viewer, organizationId),
     catch: () => new Error("failed to resolve visibility"),
-  })
+  });
 
   const groups = yield* Effect.tryPromise({
     try: () =>
       filterLocationGroupsForVisibility(organizationId, viewer, visibility),
     catch: () => new Error("failed to list location groups"),
-  })
+  });
 
-  groups.sort((first, second) => first.name.localeCompare(second.name))
-  return yield* json(groups)
+  groups.sort((first, second) => first.name.localeCompare(second.name));
+  return yield* json(groups);
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to list location groups" }, 400),
   ),
-)
+);
 
 const createLocationGroup = Effect.gen(function* () {
-  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams)
+  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
   const admin = yield* requireOrganizationAdmin(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (admin._tag === "Left") {
-    return yield* handleAuthorizationError(admin.left)
+    return yield* handleAuthorizationError(admin.left);
   }
 
   const body = yield* parseJsonBody(LocationGroupUpsertBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
-  )
+  );
 
-  const name = body.name.trim()
+  const name = body.name.trim();
   if (name === "") {
-    return yield* json({ error: "name is required" }, 400)
+    return yield* json({ error: "name is required" }, 400);
   }
 
-  const locationIds = body.locationIds ?? []
+  const locationIds = body.locationIds ?? [];
 
   const created = yield* Effect.tryPromise({
     try: () =>
@@ -583,24 +779,26 @@ const createLocationGroup = Effect.gen(function* () {
             organizationId,
             name,
           })
-          .returning()
+          .returning();
 
         if (!group) {
-          throw new Error("failed to create location group")
+          throw new Error("failed to create location group");
         }
 
         if (locationIds.length > 0) {
           const locRows = await tx
             .select({ id: locations.id })
             .from(locations)
-            .where(and(
-              eq(locations.organizationId, organizationId),
-              inArray(locations.id, [...new Set(locationIds)]),
-            ))
+            .where(
+              and(
+                eq(locations.organizationId, organizationId),
+                inArray(locations.id, [...new Set(locationIds)]),
+              ),
+            );
 
-          const validIds = locRows.map((row) => row.id)
+          const validIds = locRows.map((row) => row.id);
           if (validIds.length !== [...new Set(locationIds)].length) {
-            throw new Error("unknown location ids for organization")
+            throw new Error("unknown location ids for organization");
           }
 
           await tx.insert(locationGroupLocations).values(
@@ -608,35 +806,33 @@ const createLocationGroup = Effect.gen(function* () {
               locationGroupId: group.id,
               locationId,
             })),
-          )
+          );
         }
 
-        return group
+        return group;
       }),
     catch: (err) =>
-      err instanceof Error
-        ? err
-        : new Error("failed to create location group"),
-  })
+      err instanceof Error ? err : new Error("failed to create location group"),
+  });
 
-  return yield* json(created, 201)
+  return yield* json(created, 201);
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to create location group" }, 400),
   ),
-)
+);
 
 const updateLocationGroup = Effect.gen(function* () {
   const { id: organizationId, groupId } =
-    yield* HttpRouter.schemaPathParams(OrgGroupParams)
+    yield* HttpRouter.schemaPathParams(OrgGroupParams);
 
   const admin = yield* requireOrganizationAdmin(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (admin._tag === "Left") {
-    return yield* handleAuthorizationError(admin.left)
+    return yield* handleAuthorizationError(admin.left);
   }
 
   const groupRows = yield* Effect.tryPromise({
@@ -644,58 +840,62 @@ const updateLocationGroup = Effect.gen(function* () {
       db
         .select()
         .from(locationGroups)
-        .where(and(
-          eq(locationGroups.id, groupId),
-          eq(locationGroups.organizationId, organizationId),
-        ))
+        .where(
+          and(
+            eq(locationGroups.id, groupId),
+            eq(locationGroups.organizationId, organizationId),
+          ),
+        )
         .limit(1),
     catch: () => new Error("failed to validate location group"),
-  })
+  });
 
   if (!groupRows[0]) {
-    return yield* json({ error: "location group not found" }, 404)
+    return yield* json({ error: "location group not found" }, 404);
   }
 
   const body = yield* parseJsonBody(LocationGroupRenameBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
-  )
+  );
 
   if (body.name === undefined && body.locationIds === undefined) {
-    return yield* json({ error: "nothing to update" }, 400)
+    return yield* json({ error: "nothing to update" }, 400);
   }
 
   yield* Effect.tryPromise({
     try: () =>
       db.transaction(async (tx) => {
         if (body.name !== undefined) {
-          const name = body.name.trim()
+          const name = body.name.trim();
           if (name === "") {
-            throw new Error("name cannot be empty")
+            throw new Error("name cannot be empty");
           }
           await tx
             .update(locationGroups)
             .set({ name, updatedAt: new Date() })
-            .where(eq(locationGroups.id, groupId))
+            .where(eq(locationGroups.id, groupId));
         }
 
         if (body.locationIds !== undefined) {
-          await tx.delete(locationGroupLocations).where(
-            eq(locationGroupLocations.locationGroupId, groupId),
-          )
+          await tx
+            .delete(locationGroupLocations)
+            .where(eq(locationGroupLocations.locationGroupId, groupId));
 
-          const locationIds = body.locationIds
+          const locationIds = body.locationIds;
           if (locationIds.length > 0) {
             const locRows = await tx
               .select({ id: locations.id })
               .from(locations)
-              .where(and(
-                eq(locations.organizationId, organizationId),
-                inArray(locations.id, [...new Set(locationIds)]),
-              ))
+              .where(
+                and(
+                  eq(locations.organizationId, organizationId),
+                  inArray(locations.id, [...new Set(locationIds)]),
+                ),
+              );
 
-            const validIds = locRows.map((row) => row.id)
+            const validIds = locRows.map((row) => row.id);
             if (validIds.length !== [...new Set(locationIds)].length) {
-              throw new Error("unknown location ids for organization")
+              throw new Error("unknown location ids for organization");
             }
 
             await tx.insert(locationGroupLocations).values(
@@ -703,17 +903,15 @@ const updateLocationGroup = Effect.gen(function* () {
                 locationGroupId: groupId,
                 locationId,
               })),
-            )
+            );
           }
         }
 
-        return true
+        return true;
       }),
     catch: (err) =>
-      err instanceof Error
-        ? err
-        : new Error("failed to update location group"),
-  })
+      err instanceof Error ? err : new Error("failed to update location group"),
+  });
 
   const refreshed = yield* Effect.tryPromise({
     try: () =>
@@ -723,7 +921,7 @@ const updateLocationGroup = Effect.gen(function* () {
         .where(eq(locationGroups.id, groupId))
         .limit(1),
     catch: () => new Error("failed to load location group"),
-  })
+  });
 
   const junctionSlice = yield* Effect.tryPromise({
     try: () =>
@@ -732,33 +930,33 @@ const updateLocationGroup = Effect.gen(function* () {
         .from(locationGroupLocations)
         .where(eq(locationGroupLocations.locationGroupId, groupId)),
     catch: () => new Error("failed to load junction"),
-  })
+  });
 
-  const group = refreshed[0]
+  const group = refreshed[0];
   if (!group) {
-    return yield* json({ error: "location group not found" }, 404)
+    return yield* json({ error: "location group not found" }, 404);
   }
 
   return yield* json({
     ...group,
     locationIds: junctionSlice.map((j) => j.locationId),
-  })
+  });
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to update location group" }, 400),
   ),
-)
+);
 
 const listAllManagerScopes = Effect.gen(function* () {
-  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams)
+  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
 
   const admin = yield* requireOrganizationAdmin(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (admin._tag === "Left") {
-    return yield* handleAuthorizationError(admin.left)
+    return yield* handleAuthorizationError(admin.left);
   }
 
   const rows = yield* Effect.tryPromise({
@@ -769,26 +967,26 @@ const listAllManagerScopes = Effect.gen(function* () {
         .innerJoin(employees, eq(managerScopes.employeeId, employees.id))
         .where(eq(employees.organizationId, organizationId)),
     catch: () => new Error("failed to list manager scopes"),
-  })
+  });
 
-  return yield* json(rows.map((r) => r.scope))
+  return yield* json(rows.map((r) => r.scope));
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to list manager scopes" }, 400),
   ),
-)
+);
 
 const listEmployeeManagerScopes = Effect.gen(function* () {
   const { id: organizationId, employeeId } =
-    yield* HttpRouter.schemaPathParams(OrgEmpScopeParams)
+    yield* HttpRouter.schemaPathParams(OrgEmpScopeParams);
 
   const admin = yield* requireOrganizationAdmin(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (admin._tag === "Left") {
-    return yield* handleAuthorizationError(admin.left)
+    return yield* handleAuthorizationError(admin.left);
   }
 
   const targetRows = yield* Effect.tryPromise({
@@ -796,16 +994,18 @@ const listEmployeeManagerScopes = Effect.gen(function* () {
       db
         .select()
         .from(employees)
-        .where(and(
-          eq(employees.id, employeeId),
-          eq(employees.organizationId, organizationId),
-        ))
+        .where(
+          and(
+            eq(employees.id, employeeId),
+            eq(employees.organizationId, organizationId),
+          ),
+        )
         .limit(1),
     catch: () => new Error("failed to validate employee"),
-  })
+  });
 
   if (!targetRows[0]) {
-    return yield* json({ error: "employee not found" }, 404)
+    return yield* json({ error: "employee not found" }, 404);
   }
 
   const scopes = yield* Effect.tryPromise({
@@ -815,45 +1015,47 @@ const listEmployeeManagerScopes = Effect.gen(function* () {
         .from(managerScopes)
         .where(eq(managerScopes.employeeId, employeeId)),
     catch: () => new Error("failed to load manager scopes"),
-  })
+  });
 
-  return yield* json(scopes)
+  return yield* json(scopes);
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to load manager scopes" }, 400),
   ),
-)
+);
 
 const assignManagerScope = Effect.gen(function* () {
-  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams)
+  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
   const admin = yield* requireOrganizationAdmin(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (admin._tag === "Left") {
-    return yield* handleAuthorizationError(admin.left)
+    return yield* handleAuthorizationError(admin.left);
   }
 
   const body = yield* parseJsonBody(ManagerScopeMutationBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
-  )
+  );
 
   const targetRows = yield* Effect.tryPromise({
     try: () =>
       db
         .select()
         .from(employees)
-        .where(and(
-          eq(employees.id, body.employeeId),
-          eq(employees.organizationId, organizationId),
-        ))
+        .where(
+          and(
+            eq(employees.id, body.employeeId),
+            eq(employees.organizationId, organizationId),
+          ),
+        )
         .limit(1),
     catch: () => new Error("failed to validate employee"),
-  })
+  });
 
   if (!targetRows[0]) {
-    return yield* json({ error: "employee not found" }, 404)
+    return yield* json({ error: "employee not found" }, 404);
   }
 
   const okScope = yield* Effect.tryPromise({
@@ -864,10 +1066,10 @@ const assignManagerScope = Effect.gen(function* () {
         body.scopeId,
       ),
     catch: () => new Error("failed to validate scope"),
-  })
+  });
 
   if (!okScope) {
-    return yield* json({ error: "unknown scope resource" }, 400)
+    return yield* json({ error: "unknown scope resource" }, 400);
   }
 
   const duplicate = yield* Effect.tryPromise({
@@ -875,17 +1077,19 @@ const assignManagerScope = Effect.gen(function* () {
       db
         .select({ id: managerScopes.id })
         .from(managerScopes)
-        .where(and(
-          eq(managerScopes.employeeId, body.employeeId),
-          eq(managerScopes.scopeType, body.scopeType),
-          eq(managerScopes.scopeId, body.scopeId),
-        ))
+        .where(
+          and(
+            eq(managerScopes.employeeId, body.employeeId),
+            eq(managerScopes.scopeType, body.scopeType),
+            eq(managerScopes.scopeId, body.scopeId),
+          ),
+        )
         .limit(1),
     catch: () => new Error("failed to validate duplicate scope"),
-  })
+  });
 
   if (duplicate[0]) {
-    return yield* json({ error: "scope assignment already exists" }, 409)
+    return yield* json({ error: "scope assignment already exists" }, 409);
   }
 
   const inserted = yield* Effect.tryPromise({
@@ -899,26 +1103,26 @@ const assignManagerScope = Effect.gen(function* () {
         })
         .returning(),
     catch: () => new Error("failed to assign manager scope"),
-  })
+  });
 
-  return yield* json(inserted[0], 201)
+  return yield* json(inserted[0], 201);
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to assign manager scope" }, 400),
   ),
-)
+);
 
 const revokeManagerScope = Effect.gen(function* () {
   const { id: organizationId, recordId } =
-    yield* HttpRouter.schemaPathParams(OrgScopeRecordParams)
+    yield* HttpRouter.schemaPathParams(OrgScopeRecordParams);
 
   const admin = yield* requireOrganizationAdmin(organizationId).pipe(
     Effect.either,
-  )
+  );
   if (admin._tag === "Left") {
-    return yield* handleAuthorizationError(admin.left)
+    return yield* handleAuthorizationError(admin.left);
   }
 
   const row = yield* Effect.tryPromise({
@@ -927,35 +1131,40 @@ const revokeManagerScope = Effect.gen(function* () {
         .select({ scope: managerScopes })
         .from(managerScopes)
         .innerJoin(employees, eq(managerScopes.employeeId, employees.id))
-        .where(and(
-          eq(managerScopes.id, recordId),
-          eq(employees.organizationId, organizationId),
-        ))
+        .where(
+          and(
+            eq(managerScopes.id, recordId),
+            eq(employees.organizationId, organizationId),
+          ),
+        )
         .limit(1),
     catch: () => new Error("failed to revoke manager scope"),
-  })
+  });
 
   if (!row[0]) {
-    return yield* json({ error: "scope assignment not found" }, 404)
+    return yield* json({ error: "scope assignment not found" }, 404);
   }
 
   yield* Effect.tryPromise({
-    try: () =>
-      db.delete(managerScopes).where(eq(managerScopes.id, recordId)),
+    try: () => db.delete(managerScopes).where(eq(managerScopes.id, recordId)),
     catch: () => new Error("failed to revoke manager scope"),
-  })
+  });
 
-  return yield* json({ ok: true })
+  return yield* json({ ok: true });
 }).pipe(
   Effect.catchAll((error) =>
     error instanceof Error
       ? json({ error: error.message }, 400)
       : json({ error: "failed to revoke manager scope" }, 400),
   ),
-)
+);
 
 export const ScopedResourcesGroupLive = HttpRouter.empty.pipe(
   HttpRouter.get("/organizations/:id/locations", listLocations),
+  HttpRouter.get(
+    "/organizations/:id/locations/by-name/:locationName",
+    getLocationByName,
+  ),
   HttpRouter.post("/organizations/:id/locations", createLocation),
   HttpRouter.patch("/organizations/:id/locations/:locationId", updateLocation),
 
@@ -983,4 +1192,4 @@ export const ScopedResourcesGroupLive = HttpRouter.empty.pipe(
     "/organizations/:id/manager-scopes/:recordId",
     revokeManagerScope,
   ),
-)
+);

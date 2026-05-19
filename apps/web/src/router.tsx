@@ -13,6 +13,7 @@ import { SettingsCompanyProfileRoute } from "./routes/settings/company-profile";
 import { SettingsDepartmentsRoute } from "./routes/settings/departments";
 import { SettingsImportRoute } from "./routes/settings/import";
 import { SettingsLocationGroupsRoute } from "./routes/settings/location-groups";
+import { SettingsLocationDetailRoute } from "./routes/settings/location-detail";
 import { SettingsLocationsRoute } from "./routes/settings/locations";
 import { SettingsLayout } from "./routes/settings/settings-layout";
 import { SettingsMembersRoute } from "./routes/settings/members";
@@ -94,6 +95,10 @@ export const router = createBrowserRouter([
       {
         path: "locations",
         element: <SettingsLocationsRoute />,
+      },
+      {
+        path: "locations/:locationname",
+        element: <SettingsLocationDetailRoute />,
       },
       {
         path: "departments",
