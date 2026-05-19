@@ -1,18 +1,18 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: punch-postgres
+    container_name: cron-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: punch
-      POSTGRES_USER: punch
-      POSTGRES_PASSWORD: punch
+      POSTGRES_DB: cron
+      POSTGRES_USER: cron
+      POSTGRES_PASSWORD: cron
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U punch -d punch"]
+      test: ["CMD-SHELL", "pg_isready -U cron -d cron"]
       interval: 5s
       timeout: 5s
       retries: 5

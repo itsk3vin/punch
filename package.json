@@ -1,5 +1,5 @@
 {
-  "name": "punch",
+  "name": "cron",
   "private": true,
   "scripts": {
     "build": "turbo run build",

@@ -13,7 +13,7 @@ export const config = {
     audience: process.env.AUTH0_AUDIENCE ?? "",
   },
   databaseUrl:
-    process.env.DATABASE_URL ?? "postgres://punch:punch@localhost:5432/punch",
+    process.env.DATABASE_URL ?? "postgres://cron:cron@localhost:5432/cron",
   r2: {
     accountId: process.env.R2_ACCOUNT_ID ?? "",
     accessKeyId: process.env.R2_ACCESS_KEY_ID ?? "",

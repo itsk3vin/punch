@@ -8,6 +8,6 @@ export default defineConfig({
   dbCredentials: {
     url:
       process.env.DATABASE_URL ??
-      "postgres://punch:punch@localhost:5432/punch?sslmode=disable",
+      "postgres://cron:cron@localhost:5432/cron?sslmode=disable",
   },
 })
