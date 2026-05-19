@@ -276,7 +276,7 @@ export function SettingsLocationsRoute() {
   return (
     <section className="w-full max-w-full">
       <div className="flex flex-col gap-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 mr-4">
           <div className="flex flex-col mx-4">
             <h1 className="text-xl font-medium tracking-tight">Locations</h1>
             <p className="mt-1 text-sm text-muted-foreground">

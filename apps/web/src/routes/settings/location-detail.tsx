@@ -1,17 +1,9 @@
 import { useAuth0 } from "@auth0/auth0-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
 import { Link, Navigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -23,13 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useEmployee } from "@/hooks/use-employee";
-import {
-  IconChevronDown,
-  IconMapPin,
-  IconPencil,
-  IconUser,
-  IconUsers,
-} from "@tabler/icons-react";
+import { IconCheck, IconPencil, IconPlus, IconX } from "@tabler/icons-react";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
@@ -60,12 +46,7 @@ type LocationFormValues = {
   state: string;
 };
 
-const emptyLocationForm: LocationFormValues = {
-  name: "",
-  address: "",
-  city: "",
-  state: "",
-};
+type LocationEditableField = keyof LocationFormValues;
 
 const joinedDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -91,102 +72,207 @@ function formatRole(role: string) {
     .join(" ");
 }
 
-function formatAddress(
-  location: Pick<LocationDetail, "address" | "city" | "state">,
-) {
-  return [location.address, location.city, location.state]
-    .filter(Boolean)
-    .join(", ");
+function formatLocationFieldLabel(field: LocationEditableField) {
+  if (field === "address") {
+    return "Street address";
+  }
+
+  return field.charAt(0).toUpperCase() + field.slice(1);
 }
 
-function LocationDetailsSidebar({
-  location,
+function LocationField({
+  id,
+  label,
+  value,
+  isEditing,
+  isSaving,
   canEdit,
-  onEdit,
+  onChange,
+  onStartEdit,
+  onCancel,
+  onSave,
 }: {
-  location: LocationDetail;
+  id: string;
+  label: string;
+  value: string;
+  isEditing: boolean;
+  isSaving: boolean;
   canEdit: boolean;
-  onEdit: () => void;
+  onChange: (value: string) => void;
+  onStartEdit: () => void;
+  onCancel: () => void;
+  onSave: () => void;
 }) {
   return (
-    <aside className="w-full lg:w-[360px] lg:shrink-0">
-      <div className="sticky top-10 grid gap-4">
-        <div className="rounded-xl border border-border/80 bg-card p-5 shadow-sm">
-          <div className="mb-7 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-medium tracking-tight">Properties</h2>
-              <IconChevronDown className="size-4 text-muted-foreground" />
-            </div>
-            {canEdit && (
-              <Button
-                size="icon"
-                type="button"
-                variant="ghost"
-                onClick={onEdit}
-                className="size-8 text-muted-foreground hover:text-foreground"
-              >
-                <IconPencil className="size-4" />
-                <span className="sr-only">Edit location</span>
-              </Button>
-            )}
+    <div className="grid min-w-0 gap-1.5">
+      <Label htmlFor={id} className="text-xs text-muted-foreground">
+        {label}
+      </Label>
+      <div className="relative min-w-0">
+        <Input
+          id={id}
+          value={value}
+          disabled={!isEditing || isSaving}
+          readOnly={!isEditing}
+          autoFocus={isEditing}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              onSave();
+            }
+            if (event.key === "Escape") {
+              onCancel();
+            }
+          }}
+          className={`h-9 min-w-0 disabled:cursor-default disabled:opacity-100 ${
+            isEditing ? "pr-20" : "pr-10"
+          }`}
+        />
+        {isEditing ? (
+          <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1">
+            <Button
+              type="button"
+              size="icon"
+              className="size-7"
+              disabled={isSaving}
+              onClick={onSave}
+            >
+              <IconCheck className="size-4" />
+              <span className="sr-only">Save {label}</span>
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="size-7 bg-background"
+              disabled={isSaving}
+              onClick={onCancel}
+            >
+              <IconX className="size-4" />
+              <span className="sr-only">Cancel editing {label}</span>
+            </Button>
           </div>
+        ) : (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="absolute right-1 top-1/2 size-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            disabled={!canEdit}
+            onClick={onStartEdit}
+          >
+            <IconPencil className="size-4" />
+            <span className="sr-only">Edit {label}</span>
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
-          <dl className="grid gap-6">
-            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-start gap-4">
-              <dt className="text-sm text-muted-foreground">Location</dt>
-              <dd className="min-w-0 text-sm font-medium text-foreground">
-                {location.name}
-              </dd>
-            </div>
-            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-start gap-4">
-              <dt className="text-sm text-muted-foreground">Manager</dt>
-              <dd className="flex min-w-0 items-start gap-2 text-sm text-foreground">
-                <IconUser className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 truncate">
-                  {location.managers.join(", ") || "None"}
-                </span>
-              </dd>
-            </div>
-            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-start gap-4">
-              <dt className="text-sm text-muted-foreground">Employees</dt>
-              <dd className="flex items-center gap-2 text-sm text-foreground">
-                <IconUsers className="size-4 text-muted-foreground" />
-                {location.employeeCount}
-              </dd>
-            </div>
-            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-start gap-4">
-              <dt className="text-sm text-muted-foreground">Address</dt>
-              <dd className="flex min-w-0 items-start gap-2 text-sm leading-6 text-foreground">
-                <IconMapPin className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                <span>{formatAddress(location)}</span>
-              </dd>
-            </div>
-          </dl>
-        </div>
-
-        <div className="rounded-xl border border-border/80 bg-card p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-medium tracking-tight">Activity</h2>
-            <IconChevronDown className="size-4 text-muted-foreground" />
-          </div>
-          <p className="mt-5 text-sm text-muted-foreground">
-            Location created for {location.employeeCount} employees.
-          </p>
+function LocationDetailsForm({
+  location,
+  values,
+  editingField,
+  savingField,
+  canEdit,
+  onChange,
+  onStartEdit,
+  onCancel,
+  onSave,
+}: {
+  location: LocationDetail;
+  values: LocationFormValues;
+  editingField: LocationEditableField | null;
+  savingField: LocationEditableField | null;
+  canEdit: boolean;
+  onChange: (field: LocationEditableField, value: string) => void;
+  onStartEdit: (field: LocationEditableField) => void;
+  onCancel: () => void;
+  onSave: (field: LocationEditableField) => void;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <LocationField
+          id="location-name"
+          label="Name"
+          value={values.name}
+          isEditing={editingField === "name"}
+          isSaving={savingField === "name"}
+          canEdit={canEdit && editingField === null}
+          onChange={(value) => onChange("name", value)}
+          onStartEdit={() => onStartEdit("name")}
+          onCancel={onCancel}
+          onSave={() => onSave("name")}
+        />
+        <div className="grid min-w-0 gap-1.5">
+          <Label
+            htmlFor="location-manager"
+            className="text-xs text-muted-foreground"
+          >
+            Manager
+          </Label>
+          <Input
+            id="location-manager"
+            value={location.managers.join(", ") || "No manager"}
+            disabled
+            readOnly
+            className="h-9 disabled:cursor-default disabled:opacity-100"
+          />
         </div>
       </div>
-    </aside>
+      <LocationField
+        id="location-address"
+        label="Street address"
+        value={values.address}
+        isEditing={editingField === "address"}
+        isSaving={savingField === "address"}
+        canEdit={canEdit && editingField === null}
+        onChange={(value) => onChange("address", value)}
+        onStartEdit={() => onStartEdit("address")}
+        onCancel={onCancel}
+        onSave={() => onSave("address")}
+      />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <LocationField
+          id="location-city"
+          label="City"
+          value={values.city}
+          isEditing={editingField === "city"}
+          isSaving={savingField === "city"}
+          canEdit={canEdit && editingField === null}
+          onChange={(value) => onChange("city", value)}
+          onStartEdit={() => onStartEdit("city")}
+          onCancel={onCancel}
+          onSave={() => onSave("city")}
+        />
+        <LocationField
+          id="location-state"
+          label="State"
+          value={values.state}
+          isEditing={editingField === "state"}
+          isSaving={savingField === "state"}
+          canEdit={canEdit && editingField === null}
+          onChange={(value) => onChange("state", value)}
+          onStartEdit={() => onStartEdit("state")}
+          onCancel={onCancel}
+          onSave={() => onSave("state")}
+        />
+      </div>
+    </div>
   );
 }
 
 function LocationMembersTable({ members }: { members: LocationMember[] }) {
   return (
-    <div className="w-full rounded-xl bg-card text-sm [&_table_td]:py-2 [&_table_th]:h-auto [&_table_th]:py-2">
-      <Table className="border-separate border-spacing-x-0 border-spacing-y-0.5 [&_tr[data-location-member-row]>td]:transition-colors [&_tr[data-location-member-row]>td:first-child]:rounded-l-lg [&_tr[data-location-member-row]>td:last-child]:rounded-r-lg [&_tr[data-location-member-row]:hover>td]:bg-muted/25">
+    <div className="w-full text-sm [&_table_td]:h-14 [&_table_td]:py-2 [&_table_th]:h-14 [&_table_th]:py-2">
+      <Table className="border-separate border-spacing-x-0 border-spacing-y-2 [&_tr[data-location-member-row]>td]:border-y [&_tr[data-location-member-row]>td]:border-border [&_tr[data-location-member-row]>td]:bg-background [&_tr[data-location-member-row]>td]:transition-colors [&_tr[data-location-member-row]>td:first-child]:rounded-l-lg [&_tr[data-location-member-row]>td:first-child]:border-l [&_tr[data-location-member-row]>td:last-child]:rounded-r-lg [&_tr[data-location-member-row]>td:last-child]:border-r [&_tr[data-location-member-row]:hover>td]:bg-muted/25">
         <TableHeader className="hover:bg-transparent border-0">
-          <TableRow className="hover:bg-transparent border-0">
-            <TableHead className="border-0">Name</TableHead>
-            <TableHead className="border-0">Role</TableHead>
-            <TableHead className="border-0 text-right">Joined</TableHead>
+          <TableRow className="hover:bg-transparent border-0 [&>th]:border-y [&>th]:border-border [&>th]:bg-background [&>th:first-child]:rounded-l-lg [&>th:first-child]:border-l [&>th:last-child]:rounded-r-lg [&>th:last-child]:border-r">
+            <TableHead className="font-medium text-foreground">Name</TableHead>
+            <TableHead className="font-medium text-foreground">Role</TableHead>
+            <TableHead className="text-right">Joined</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -207,11 +293,7 @@ function LocationMembersTable({ members }: { members: LocationMember[] }) {
                 className="hover:bg-transparent"
               >
                 <TableCell>{member.name}</TableCell>
-                <TableCell>
-                  <span className="rounded-md bg-primary/10 px-2 py-1 text-primary">
-                    {formatRole(member.role)}
-                  </span>
-                </TableCell>
+                <TableCell>{formatRole(member.role)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">
                   {formatJoinedDate(member.createdAt)}
                 </TableCell>
@@ -231,22 +313,15 @@ export function SettingsLocationDetailRoute() {
   const [location, setLocation] = useState<LocationDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
-  const {
-    handleSubmit,
-    register,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<LocationFormValues>({
-    values: location
-      ? {
-          name: location.name,
-          address: location.address,
-          city: location.city,
-          state: location.state,
-        }
-      : emptyLocationForm,
+  const [editingField, setEditingField] =
+    useState<LocationEditableField | null>(null);
+  const [savingField, setSavingField] =
+    useState<LocationEditableField | null>(null);
+  const [draftValues, setDraftValues] = useState<LocationFormValues>({
+    name: "",
+    address: "",
+    city: "",
+    state: "",
   });
 
   const canAccessPage =
@@ -315,6 +390,20 @@ export function SettingsLocationDetailRoute() {
     };
   }, [canAccessPage, organization, reload]);
 
+  useEffect(() => {
+    if (!location) {
+      return;
+    }
+
+    setDraftValues({
+      name: location.name,
+      address: location.address,
+      city: location.city,
+      state: location.state,
+    });
+    setEditingField(null);
+  }, [location]);
+
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">Loading...</div>;
   }
@@ -323,22 +412,51 @@ export function SettingsLocationDetailRoute() {
     return <Navigate to={`/${orgname ?? ""}/settings/profile`} replace />;
   }
 
-  async function onSave(values: LocationFormValues) {
+  function startEditingField(field: LocationEditableField) {
+    if (!location) {
+      return;
+    }
+
+    setDraftValues({
+      name: location.name,
+      address: location.address,
+      city: location.city,
+      state: location.state,
+    });
+    setEditingField(field);
+  }
+
+  function cancelEditingField() {
+    if (location) {
+      setDraftValues({
+        name: location.name,
+        address: location.address,
+        city: location.city,
+        state: location.state,
+      });
+    }
+    setEditingField(null);
+  }
+
+  async function saveLocationField(field: LocationEditableField) {
     if (!organization || !location) {
       return;
     }
 
-    const name = values.name.trim();
-    const address = values.address.trim();
-    const city = values.city.trim();
-    const state = values.state.trim();
+    const nextValues = {
+      name: draftValues.name.trim(),
+      address: draftValues.address.trim(),
+      city: draftValues.city.trim(),
+      state: draftValues.state.trim(),
+    };
 
-    if (!name || !address || !city || !state) {
-      toast.error("Name, address, city, and state are required.");
+    if (!nextValues[field]) {
+      toast.error(`${formatLocationFieldLabel(field)} is required.`);
       return;
     }
 
     try {
+      setSavingField(field);
       const accessToken = await getAccessTokenSilently();
       const response = await fetch(
         `${apiBaseUrl}/api/v1/organizations/${organization.id}/locations/${location.id}`,
@@ -348,7 +466,7 @@ export function SettingsLocationDetailRoute() {
             authorization: `Bearer ${accessToken}`,
             "content-type": "application/json",
           },
-          body: JSON.stringify({ name, address, city, state }),
+          body: JSON.stringify(nextValues),
         },
       );
 
@@ -361,22 +479,29 @@ export function SettingsLocationDetailRoute() {
         );
       }
 
+      const updatedLocation = body as Partial<LocationDetail> | null;
+      setLocation({
+        ...location,
+        ...nextValues,
+        ...(updatedLocation ?? {}),
+      });
+      setEditingField(null);
       toast.success("Location updated.");
-      setIsEditDialogOpen(false);
-      await reload();
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : "Could not update location.",
       );
+    } finally {
+      setSavingField(null);
     }
   }
 
   return (
     <section className="w-full max-w-full">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-8">
         <Link
           to={`/${orgname ?? ""}/settings/locations`}
-          className="text-sm text-muted-foreground hover:text-foreground"
+          className="text-sm text-muted-foreground hover:text-foreground mx-4"
         >
           Locations
         </Link>
@@ -386,125 +511,39 @@ export function SettingsLocationDetailRoute() {
         ) : loadError ? (
           <div className="text-sm text-destructive">{loadError}</div>
         ) : location ? (
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
-            <main className="min-w-0 flex-1">
-              <div className="mx-auto w-full max-w-4xl">
-                <div className="mb-8">
-                  <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                    <IconMapPin className="size-6" />
-                  </div>
-                  <h1 className="text-3xl font-semibold tracking-tight">
-                    {location.name}
-                  </h1>
-                  <p className="mt-3 text-base text-muted-foreground">
-                    {formatAddress(location)}
-                  </p>
-                </div>
+          <div className="px-4">
+            <div className="mx-auto w-full max-w-xl pt-24">
+              <LocationDetailsForm
+                location={location}
+                values={draftValues}
+                editingField={editingField}
+                savingField={savingField}
+                canEdit={canEdit}
+                onChange={(field, value) =>
+                  setDraftValues((current) => ({
+                    ...current,
+                    [field]: value,
+                  }))
+                }
+                onStartEdit={startEditingField}
+                onCancel={cancelEditingField}
+                onSave={(field) => void saveLocationField(field)}
+              />
 
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-medium tracking-tight">
-                    Employees
-                  </h2>
-                </div>
-                <LocationMembersTable members={location.members} />
+              <div className="mt-12 mb-4 flex items-center justify-between gap-3">
+                <h1 className="text-xl font-medium tracking-tight">
+                  Employees
+                </h1>
+                <Button asChild size="sm" variant="outline">
+                  <Link to={`/${orgname ?? ""}/settings/members`}>
+                    <IconPlus className="size-4" />
+                    Invite person
+                  </Link>
+                </Button>
               </div>
-            </main>
-
-            <LocationDetailsSidebar
-              location={location}
-              canEdit={canEdit}
-              onEdit={() => setIsEditDialogOpen(true)}
-            />
+              <LocationMembersTable members={location.members} />
+            </div>
           </div>
-        ) : null}
-
-        {location ? (
-          <Dialog
-            open={isEditDialogOpen}
-            onOpenChange={(open) => {
-              setIsEditDialogOpen(open);
-              if (!open) {
-                reset({
-                  name: location.name,
-                  address: location.address,
-                  city: location.city,
-                  state: location.state,
-                });
-              }
-            }}
-          >
-            <DialogContent>
-              <form onSubmit={handleSubmit((values) => void onSave(values))}>
-                <DialogHeader>
-                  <DialogTitle>Edit location</DialogTitle>
-                </DialogHeader>
-                <div className="mt-4 grid gap-2">
-                  <Label htmlFor="location-address">Street address</Label>
-                  <Input
-                    id="location-address"
-                    disabled={isSubmitting}
-                    autoFocus
-                    {...register("address", {
-                      validate: (fieldValue) =>
-                        fieldValue.trim().length > 0 || "Required",
-                    })}
-                  />
-                  {errors.address && (
-                    <p className="text-xs text-destructive">
-                      {errors.address.message}
-                    </p>
-                  )}
-                </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label htmlFor="location-city">City</Label>
-                    <Input
-                      id="location-city"
-                      disabled={isSubmitting}
-                      {...register("city", {
-                        validate: (fieldValue) =>
-                          fieldValue.trim().length > 0 || "Required",
-                      })}
-                    />
-                    {errors.city && (
-                      <p className="text-xs text-destructive">
-                        {errors.city.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="location-state">State</Label>
-                    <Input
-                      id="location-state"
-                      disabled={isSubmitting}
-                      {...register("state", {
-                        validate: (fieldValue) =>
-                          fieldValue.trim().length > 0 || "Required",
-                      })}
-                    />
-                    {errors.state && (
-                      <p className="text-xs text-destructive">
-                        {errors.state.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter className="mt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSubmitting}
-                    onClick={() => setIsEditDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Saving..." : "Save"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
         ) : null}
       </div>
     </section>

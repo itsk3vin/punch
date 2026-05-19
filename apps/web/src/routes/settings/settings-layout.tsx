@@ -126,7 +126,7 @@ export function SettingsLayout() {
         </SidebarContent>
       </Sidebar>
 
-      <SidebarInset className="overflow-y-auto py-10">
+      <SidebarInset className="overflow-y-auto py-10 px-4">
         <Outlet />
       </SidebarInset>
     </SidebarProvider>
