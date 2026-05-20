@@ -6,8 +6,6 @@ import { db } from "../../db/index.js";
 import {
   departments,
   employees,
-  locationGroupLocations,
-  locationGroups,
   locations,
   managerScopes,
 } from "../../db/schema.js";
@@ -46,11 +44,6 @@ const OrgDeptParams = Schema.Struct({
   departmentId: Schema.String,
 });
 
-const OrgGroupParams = Schema.Struct({
-  id: Schema.String,
-  groupId: Schema.String,
-});
-
 const OrgEmpScopeParams = Schema.Struct({
   id: Schema.String,
   employeeId: Schema.String,
@@ -64,7 +57,6 @@ const OrgScopeRecordParams = Schema.Struct({
 const ManagerScopeMutationBody = Schema.Struct({
   employeeId: Schema.String,
   scopeType: Schema.Union(
-    Schema.Literal("location_group"),
     Schema.Literal("location"),
     Schema.Literal("department"),
   ),
@@ -94,16 +86,6 @@ const DepartmentUpdateBody = Schema.Struct({
   name: Schema.String,
 });
 
-const LocationGroupUpsertBody = Schema.Struct({
-  name: Schema.String,
-  locationIds: Schema.optional(Schema.Array(Schema.String)),
-});
-
-const LocationGroupRenameBody = Schema.Struct({
-  name: Schema.optional(Schema.String),
-  locationIds: Schema.optional(Schema.Array(Schema.String)),
-});
-
 const parseJsonBody = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
   HttpServerRequest.schemaBodyJson(schema).pipe(
     Effect.mapError(() => new Error("invalid request body")),
@@ -111,23 +93,9 @@ const parseJsonBody = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
 
 async function assertScopeBelongsToOrganization(
   organizationId: string,
-  scopeType: "location_group" | "location" | "department",
+  scopeType: "location" | "department",
   scopeId: string,
 ): Promise<boolean> {
-  if (scopeType === "location_group") {
-    const rows = await db
-      .select({ id: locationGroups.id })
-      .from(locationGroups)
-      .where(
-        and(
-          eq(locationGroups.id, scopeId),
-          eq(locationGroups.organizationId, organizationId),
-        ),
-      )
-      .limit(1);
-    return rows.length > 0;
-  }
-
   if (scopeType === "location") {
     const rows = await db
       .select({ id: locations.id })
@@ -154,61 +122,6 @@ async function assertScopeBelongsToOrganization(
     )
     .limit(1);
   return rows.length > 0;
-}
-
-async function filterLocationGroupsForVisibility(
-  organizationId: string,
-  viewer: typeof employees.$inferSelect,
-  visibility: OrganizationalVisibility,
-): Promise<Array<typeof locationGroups.$inferSelect>> {
-  const allGroups = await db
-    .select()
-    .from(locationGroups)
-    .where(eq(locationGroups.organizationId, organizationId));
-
-  if (visibility.kind === "all") {
-    return allGroups;
-  }
-
-  const breadth = visibility.wholeBreadthLocationIds;
-  const deptRollup =
-    await rollupParentLocationsFromDepartmentScopes(visibility);
-  const rollupLocations = new Set([...breadth, ...deptRollup]);
-
-  const directGroupScopes = await db
-    .select({ scopeId: managerScopes.scopeId })
-    .from(managerScopes)
-    .where(
-      and(
-        eq(managerScopes.employeeId, viewer.id),
-        eq(managerScopes.scopeType, "location_group"),
-      ),
-    );
-  const scopedGroupIds = new Set(directGroupScopes.map((r) => r.scopeId));
-
-  const junctions = await db
-    .select({
-      groupId: locationGroupLocations.locationGroupId,
-      locationId: locationGroupLocations.locationId,
-    })
-    .from(locationGroupLocations)
-    .innerJoin(
-      locationGroups,
-      eq(locationGroupLocations.locationGroupId, locationGroups.id),
-    )
-    .where(eq(locationGroups.organizationId, organizationId));
-
-  const visibleGroupIds = new Set<string>();
-  for (const j of junctions) {
-    if (!rollupLocations.has(j.locationId)) {
-      continue;
-    }
-    visibleGroupIds.add(j.groupId);
-  }
-
-  return allGroups.filter(
-    (g) => scopedGroupIds.has(g.id) || visibleGroupIds.has(g.id),
-  );
 }
 
 const listLocations = Effect.gen(function* () {
@@ -718,237 +631,6 @@ const updateDepartment = Effect.gen(function* () {
   ),
 );
 
-const listLocationGroups = Effect.gen(function* () {
-  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
-
-  const authorized = yield* requireOrganizationAccess(organizationId).pipe(
-    Effect.either,
-  );
-  if (authorized._tag === "Left") {
-    return yield* handleAuthorizationError(authorized.left);
-  }
-
-  const viewer = authorized.right;
-  const visibility = yield* Effect.tryPromise({
-    try: () => getOrganizationalVisibility(viewer, organizationId),
-    catch: () => new Error("failed to resolve visibility"),
-  });
-
-  const groups = yield* Effect.tryPromise({
-    try: () =>
-      filterLocationGroupsForVisibility(organizationId, viewer, visibility),
-    catch: () => new Error("failed to list location groups"),
-  });
-
-  groups.sort((first, second) => first.name.localeCompare(second.name));
-  return yield* json(groups);
-}).pipe(
-  Effect.catchAll((error) =>
-    error instanceof Error
-      ? json({ error: error.message }, 400)
-      : json({ error: "failed to list location groups" }, 400),
-  ),
-);
-
-const createLocationGroup = Effect.gen(function* () {
-  const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
-  const admin = yield* requireOrganizationAdmin(organizationId).pipe(
-    Effect.either,
-  );
-  if (admin._tag === "Left") {
-    return yield* handleAuthorizationError(admin.left);
-  }
-
-  const body = yield* parseJsonBody(LocationGroupUpsertBody).pipe(
-    Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
-  );
-
-  const name = body.name.trim();
-  if (name === "") {
-    return yield* json({ error: "name is required" }, 400);
-  }
-
-  const locationIds = body.locationIds ?? [];
-
-  const created = yield* Effect.tryPromise({
-    try: () =>
-      db.transaction(async (tx) => {
-        const [group] = await tx
-          .insert(locationGroups)
-          .values({
-            organizationId,
-            name,
-          })
-          .returning();
-
-        if (!group) {
-          throw new Error("failed to create location group");
-        }
-
-        if (locationIds.length > 0) {
-          const locRows = await tx
-            .select({ id: locations.id })
-            .from(locations)
-            .where(
-              and(
-                eq(locations.organizationId, organizationId),
-                inArray(locations.id, [...new Set(locationIds)]),
-              ),
-            );
-
-          const validIds = locRows.map((row) => row.id);
-          if (validIds.length !== [...new Set(locationIds)].length) {
-            throw new Error("unknown location ids for organization");
-          }
-
-          await tx.insert(locationGroupLocations).values(
-            validIds.map((locationId) => ({
-              locationGroupId: group.id,
-              locationId,
-            })),
-          );
-        }
-
-        return group;
-      }),
-    catch: (err) =>
-      err instanceof Error ? err : new Error("failed to create location group"),
-  });
-
-  return yield* json(created, 201);
-}).pipe(
-  Effect.catchAll((error) =>
-    error instanceof Error
-      ? json({ error: error.message }, 400)
-      : json({ error: "failed to create location group" }, 400),
-  ),
-);
-
-const updateLocationGroup = Effect.gen(function* () {
-  const { id: organizationId, groupId } =
-    yield* HttpRouter.schemaPathParams(OrgGroupParams);
-
-  const admin = yield* requireOrganizationAdmin(organizationId).pipe(
-    Effect.either,
-  );
-  if (admin._tag === "Left") {
-    return yield* handleAuthorizationError(admin.left);
-  }
-
-  const groupRows = yield* Effect.tryPromise({
-    try: () =>
-      db
-        .select()
-        .from(locationGroups)
-        .where(
-          and(
-            eq(locationGroups.id, groupId),
-            eq(locationGroups.organizationId, organizationId),
-          ),
-        )
-        .limit(1),
-    catch: () => new Error("failed to validate location group"),
-  });
-
-  if (!groupRows[0]) {
-    return yield* json({ error: "location group not found" }, 404);
-  }
-
-  const body = yield* parseJsonBody(LocationGroupRenameBody).pipe(
-    Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
-  );
-
-  if (body.name === undefined && body.locationIds === undefined) {
-    return yield* json({ error: "nothing to update" }, 400);
-  }
-
-  yield* Effect.tryPromise({
-    try: () =>
-      db.transaction(async (tx) => {
-        if (body.name !== undefined) {
-          const name = body.name.trim();
-          if (name === "") {
-            throw new Error("name cannot be empty");
-          }
-          await tx
-            .update(locationGroups)
-            .set({ name, updatedAt: new Date() })
-            .where(eq(locationGroups.id, groupId));
-        }
-
-        if (body.locationIds !== undefined) {
-          await tx
-            .delete(locationGroupLocations)
-            .where(eq(locationGroupLocations.locationGroupId, groupId));
-
-          const locationIds = body.locationIds;
-          if (locationIds.length > 0) {
-            const locRows = await tx
-              .select({ id: locations.id })
-              .from(locations)
-              .where(
-                and(
-                  eq(locations.organizationId, organizationId),
-                  inArray(locations.id, [...new Set(locationIds)]),
-                ),
-              );
-
-            const validIds = locRows.map((row) => row.id);
-            if (validIds.length !== [...new Set(locationIds)].length) {
-              throw new Error("unknown location ids for organization");
-            }
-
-            await tx.insert(locationGroupLocations).values(
-              validIds.map((locationId) => ({
-                locationGroupId: groupId,
-                locationId,
-              })),
-            );
-          }
-        }
-
-        return true;
-      }),
-    catch: (err) =>
-      err instanceof Error ? err : new Error("failed to update location group"),
-  });
-
-  const refreshed = yield* Effect.tryPromise({
-    try: () =>
-      db
-        .select()
-        .from(locationGroups)
-        .where(eq(locationGroups.id, groupId))
-        .limit(1),
-    catch: () => new Error("failed to load location group"),
-  });
-
-  const junctionSlice = yield* Effect.tryPromise({
-    try: () =>
-      db
-        .select({ locationId: locationGroupLocations.locationId })
-        .from(locationGroupLocations)
-        .where(eq(locationGroupLocations.locationGroupId, groupId)),
-    catch: () => new Error("failed to load junction"),
-  });
-
-  const group = refreshed[0];
-  if (!group) {
-    return yield* json({ error: "location group not found" }, 404);
-  }
-
-  return yield* json({
-    ...group,
-    locationIds: junctionSlice.map((j) => j.locationId),
-  });
-}).pipe(
-  Effect.catchAll((error) =>
-    error instanceof Error
-      ? json({ error: error.message }, 400)
-      : json({ error: "failed to update location group" }, 400),
-  ),
-);
-
 const listAllManagerScopes = Effect.gen(function* () {
   const { id: organizationId } = yield* HttpRouter.schemaPathParams(OrgParams);
 
@@ -1173,13 +855,6 @@ export const ScopedResourcesGroupLive = HttpRouter.empty.pipe(
   HttpRouter.patch(
     "/organizations/:id/departments/:departmentId",
     updateDepartment,
-  ),
-
-  HttpRouter.get("/organizations/:id/location-groups", listLocationGroups),
-  HttpRouter.post("/organizations/:id/location-groups", createLocationGroup),
-  HttpRouter.patch(
-    "/organizations/:id/location-groups/:groupId",
-    updateLocationGroup,
   ),
 
   HttpRouter.get("/organizations/:id/manager-scopes", listAllManagerScopes),

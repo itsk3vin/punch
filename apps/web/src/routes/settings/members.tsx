@@ -54,11 +54,6 @@ type DepartmentRow = {
   name: string;
 };
 
-type LocationGroupRow = {
-  id: string;
-  name: string;
-};
-
 type OrganizationMember = {
   id: string;
   email: string;
@@ -95,7 +90,7 @@ type InviteMemberFormValues = {
 type ManagerScopeRecord = {
   id: string;
   employeeId: string;
-  scopeType: "location_group" | "location" | "department";
+  scopeType: "location" | "department";
   scopeId: string;
 };
 
@@ -167,7 +162,6 @@ export function SettingsMembersRoute() {
   const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
   const [locationsList, setLocationsList] = useState<LocationRow[]>([]);
   const [departmentsList, setDepartmentsList] = useState<DepartmentRow[]>([]);
-  const [locationGroups, setLocationGroups] = useState<LocationGroupRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -191,9 +185,9 @@ export function SettingsMembersRoute() {
     ManagerScopeRecord[]
   >([]);
   const [managerScopesLoading, setManagerScopesLoading] = useState(false);
-  const [newScopeType, setNewScopeType] = useState<
-    "location_group" | "location" | "department"
-  >("location");
+  const [newScopeType, setNewScopeType] = useState<"location" | "department">(
+    "location",
+  );
   const [newScopeTargetId, setNewScopeTargetId] = useState("");
 
   const isAdmin = employee?.role === "admin";
@@ -345,23 +339,11 @@ export function SettingsMembersRoute() {
         throw new Error(body?.error ?? "Could not load departments.");
       }
 
-      let groupsParsed: LocationGroupRow[] = [];
-      if (isAdmin) {
-        const gRes = await fetch(
-          `${base}/organizations/${organizationId}/location-groups`,
-          { headers: authHeaders, signal },
-        );
-        if (gRes.ok) {
-          groupsParsed = (await gRes.json()) as LocationGroupRow[];
-        }
-      }
-
       return {
         members: (await membersResponse.json()) as OrganizationMember[],
         invitations: (await invitationsResponse.json()) as OrganizationInvitation[],
         locationsList: (await locResponse.json()) as LocationRow[],
         departmentsList: (await deptResponse.json()) as DepartmentRow[],
-        locationGroupsList: groupsParsed,
       };
     },
     [getAccessTokenSilently, isAdmin, organization],
@@ -374,7 +356,6 @@ export function SettingsMembersRoute() {
       setInvitations(data.invitations);
       setLocationsList(data.locationsList);
       setDepartmentsList(data.departmentsList);
-      setLocationGroups(data.locationGroupsList ?? []);
     } catch {
       toast.error("Could not refresh the member list.");
     }
@@ -399,7 +380,6 @@ export function SettingsMembersRoute() {
           setInvitations(data.invitations);
           setLocationsList(data.locationsList);
           setDepartmentsList(data.departmentsList);
-          setLocationGroups(data.locationGroupsList ?? []);
         }
       } catch (unknownError) {
         if (abortController.signal.aborted) {
@@ -456,15 +436,9 @@ export function SettingsMembersRoute() {
         ),
       ]);
 
-      const groupsRes = await fetch(
-        `${apiBaseUrl}/api/v1/organizations/${organization.id}/location-groups`,
-        { headers: { authorization: `Bearer ${token}` } },
-      );
-
       const sBody = await scopesRes.json().catch(() => null);
       const lBody = await locRes.json().catch(() => null);
       const dBody = await depRes.json().catch(() => null);
-      const grBody = await groupsRes.json().catch(() => null);
 
       if (!scopesRes.ok) {
         throw new Error(
@@ -473,30 +447,31 @@ export function SettingsMembersRoute() {
             : "Could not load manager scopes.",
         );
       }
-      if (!locRes.ok || !depRes.ok || !groupsRes.ok) {
+      if (!locRes.ok || !depRes.ok) {
         throw new Error("Could not load organization resources.");
       }
 
       const records = Array.isArray(sBody)
-        ? (sBody as ManagerScopeRecord[])
+        ? (sBody as ManagerScopeRecord[]).filter(
+            (x) =>
+              x?.id &&
+              x.scopeId &&
+              (x.scopeType === "location" || x.scopeType === "department"),
+          )
         : [];
 
-      setManagerScopesRecords(records.filter((x) => x?.id && x.scopeId));
+      setManagerScopesRecords(records);
       setLocationsList(lBody as LocationRow[]);
       setDepartmentsList(dBody as DepartmentRow[]);
-      setLocationGroups(grBody as LocationGroupRow[]);
 
-      const firstTypeDefault = (): "location_group" | "location" | "department" => {
-        if ((grBody as LocationGroupRow[])?.length) {
-          return "location_group";
-        }
-        if ((lBody as LocationRow[])?.length) {
-          return "location";
-        }
-        return "department";
-      };
+      const firstTypeDefault = (): "location" | "department" =>
+        (lBody as LocationRow[])?.length ? "location" : "department";
 
-      const defType = records[0]?.scopeType ?? firstTypeDefault();
+      const defType =
+        records[0]?.scopeType === "location" ||
+        records[0]?.scopeType === "department"
+          ? records[0].scopeType
+          : firstTypeDefault();
       setNewScopeType(defType);
       setNewScopeTargetId("");
     } catch (unknownError) {
@@ -607,14 +582,11 @@ export function SettingsMembersRoute() {
   );
 
   const newScopeOptions = useMemo((): Array<{ id: string; name: string }> => {
-    if (newScopeType === "location_group") {
-      return locationGroups;
-    }
     if (newScopeType === "location") {
       return locationsList;
     }
     return departmentsList;
-  }, [newScopeType, locationGroups, locationsList, departmentsList]);
+  }, [newScopeType, locationsList, departmentsList]);
 
   if (meLoading) {
     return (
@@ -631,12 +603,6 @@ export function SettingsMembersRoute() {
   }
 
   function scopeResolvedName(record: ManagerScopeRecord): string {
-    if (record.scopeType === "location_group") {
-      return (
-        locationGroups.find((g) => g.id === record.scopeId)?.name ??
-          record.scopeId
-      );
-    }
     if (record.scopeType === "location") {
       return locationsById.get(record.scopeId) ?? record.scopeId;
     }
@@ -1664,7 +1630,7 @@ export function SettingsMembersRoute() {
                 {managerScopesRecords.length === 0 ? (
                   <p className="px-3 py-4 text-sm text-muted-foreground">
                     No scopes yet. This manager cannot see anyone until you
-                    assign at least one group, location, or department.
+                    assign at least one location or department.
                   </p>
                 ) : (
                   <ul className="divide-y">
@@ -1675,11 +1641,9 @@ export function SettingsMembersRoute() {
                       >
                         <span>
                           <span className="text-muted-foreground">
-                            {row.scopeType === "location_group"
-                              ? "Group"
-                              : row.scopeType === "location"
-                                ? "Location"
-                                : "Department"}
+                            {row.scopeType === "location"
+                              ? "Location"
+                              : "Department"}
                             :
                           </span>{" "}
                           {scopeResolvedName(row)}
@@ -1715,7 +1679,6 @@ export function SettingsMembersRoute() {
                       setNewScopeTargetId("");
                     }}
                   >
-                    <option value="location_group">Location group</option>
                     <option value="location">Location</option>
                     <option value="department">Department</option>
                   </select>

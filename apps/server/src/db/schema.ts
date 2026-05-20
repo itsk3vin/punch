@@ -38,25 +38,6 @@ export const departments = pgTable("departments", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const locationGroups = pgTable("location_groups", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  organizationId: uuid("organization_id")
-    .notNull()
-    .references(() => organizations.id),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-})
-
-export const locationGroupLocations = pgTable("location_group_locations", {
-  locationGroupId: uuid("location_group_id")
-    .notNull()
-    .references(() => locationGroups.id),
-  locationId: uuid("location_id")
-    .notNull()
-    .references(() => locations.id),
-})
-
 export const employees = pgTable("employees", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: text("user_id").unique(),
@@ -90,7 +71,7 @@ export const managerScopes = pgTable("manager_scopes", {
   employeeId: uuid("employee_id")
     .notNull()
     .references(() => employees.id),
-  scopeType: text("scope_type").notNull(), // 'location_group' | 'location' | 'department'
+  scopeType: text("scope_type").notNull(), // 'location' | 'department'
   scopeId: uuid("scope_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })

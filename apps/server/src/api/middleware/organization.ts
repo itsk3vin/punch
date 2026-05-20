@@ -10,8 +10,6 @@ import { db } from "../../db/index.js"
 import {
   departments,
   employees,
-  locationGroupLocations,
-  locationGroups,
   locations,
   managerScopes,
 } from "../../db/schema.js"
@@ -104,24 +102,7 @@ async function managerHasScopedAccessToLocation(
       eq(managerScopes.scopeId, locationId),
     ))
     .limit(1)
-  if (directLocation.length > 0) {
-    return true
-  }
-
-  const viaLocationGroup = await db
-    .select({ id: managerScopes.id })
-    .from(managerScopes)
-    .innerJoin(
-      locationGroupLocations,
-      eq(locationGroupLocations.locationGroupId, managerScopes.scopeId),
-    )
-    .where(and(
-      eq(managerScopes.employeeId, employeeId),
-      eq(managerScopes.scopeType, "location_group"),
-      eq(locationGroupLocations.locationId, locationId),
-    ))
-    .limit(1)
-  return viaLocationGroup.length > 0
+  return directLocation.length > 0
 }
 
 async function employeeHasScopedAccessToLocation(
@@ -190,20 +171,6 @@ async function employeeHasAnyManagerScopeInOrganization(
   employeeId: string,
   organizationId: string,
 ): Promise<boolean> {
-  const locationGroupScopes = await db
-    .select({ id: managerScopes.id })
-    .from(managerScopes)
-    .innerJoin(locationGroups, eq(locationGroups.id, managerScopes.scopeId))
-    .where(and(
-      eq(managerScopes.employeeId, employeeId),
-      eq(managerScopes.scopeType, "location_group"),
-      eq(locationGroups.organizationId, organizationId),
-    ))
-    .limit(1)
-  if (locationGroupScopes.length > 0) {
-    return true
-  }
-
   const locationScopes = await db
     .select({ id: managerScopes.id })
     .from(managerScopes)
@@ -234,23 +201,10 @@ async function employeeHasAnyManagerScopeInOrganization(
 
 /** Scope entries for GET /me (names joined for UI). */
 export type MeScopePayload =
-  | { type: "location_group"; id: string; name: string }
   | { type: "location"; id: string; name: string }
   | { type: "department"; id: string; name: string }
 
 export async function fetchEmployeeScopesForMe(employeeId: string): Promise<MeScopePayload[]> {
-  const groupRows = await db
-    .select({
-      id: managerScopes.scopeId,
-      name: locationGroups.name,
-    })
-    .from(managerScopes)
-    .innerJoin(locationGroups, eq(locationGroups.id, managerScopes.scopeId))
-    .where(and(
-      eq(managerScopes.employeeId, employeeId),
-      eq(managerScopes.scopeType, "location_group"),
-    ))
-
   const locationRows = await db
     .select({
       id: managerScopes.scopeId,
@@ -276,17 +230,12 @@ export async function fetchEmployeeScopesForMe(employeeId: string): Promise<MeSc
     ))
 
   return [
-    ...groupRows.map((r) => ({
-      type: "location_group" as const,
-      id: r.id,
-      name: r.name,
-    })),
     ...locationRows.map((r) => ({ type: "location" as const, id: r.id, name: r.name })),
     ...departmentRows.map((r) => ({ type: "department" as const, id: r.id, name: r.name })),
   ]
 }
 
-/** Admin of org, manager with location scope, or manager whose location_group includes the location. */
+/** Admin of org or manager with location scope for this location. */
 export const requireLocationAccess = (locationId: string) =>
   Effect.gen(function* () {
     const employee = yield* getAuthenticatedEmployee
@@ -323,7 +272,7 @@ export const requireLocationAccess = (locationId: string) =>
     return employee
   })
 
-/** Admin of org, department-scoped manager, location-scoped manager for parent location, or group covering parent location. */
+/** Admin of org, department-scoped manager, or location-scoped manager for parent location. */
 export const requireDepartmentAccess = (departmentId: string) =>
   Effect.gen(function* () {
     const employee = yield* getAuthenticatedEmployee

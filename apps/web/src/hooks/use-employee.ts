@@ -30,7 +30,6 @@ type InvitationSummary = {
 };
 
 export type MeScopePayload =
-  | { type: "location_group"; id: string; name: string }
   | { type: "location"; id: string; name: string }
   | { type: "department"; id: string; name: string };
 

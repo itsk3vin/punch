@@ -5,8 +5,6 @@ import {
   departments,
   employees,
   invitations,
-  locationGroupLocations,
-  locationGroups,
   locations,
   managerScopes,
 } from "../../db/schema.js"
@@ -36,9 +34,6 @@ async function scopedManagerVisibility(
   const wholeBreadthLocationIds = new Set<string>()
   const departmentOnlyIds = new Set<string>()
 
-  const groupScopeIds = scopeRows
-    .filter((r) => r.scopeType === "location_group")
-    .map((r) => r.scopeId)
   const locationScopeIds = scopeRows
     .filter((r) => r.scopeType === "location")
     .map((r) => r.scopeId)
@@ -56,27 +51,6 @@ async function scopedManagerVisibility(
       ))
     for (const row of scopedLocations) {
       wholeBreadthLocationIds.add(row.id)
-    }
-  }
-
-  if (groupScopeIds.length > 0) {
-    const scopedGroupsInOrg = await db
-      .select({ id: locationGroups.id })
-      .from(locationGroups)
-      .where(and(
-        eq(locationGroups.organizationId, organizationId),
-        inArray(locationGroups.id, groupScopeIds),
-      ))
-
-    const groupIdsEffective = scopedGroupsInOrg.map((g) => g.id)
-    if (groupIdsEffective.length > 0) {
-      const junctionRows = await db
-        .select({ locationId: locationGroupLocations.locationId })
-        .from(locationGroupLocations)
-        .where(inArray(locationGroupLocations.locationGroupId, groupIdsEffective))
-      for (const jr of junctionRows) {
-        wholeBreadthLocationIds.add(jr.locationId)
-      }
     }
   }
 

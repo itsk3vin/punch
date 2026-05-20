@@ -46,11 +46,6 @@ const EmployeeResponse = Schema.Struct({
 
 const MeScopeItem = Schema.Union(
   Schema.Struct({
-    type: Schema.Literal("location_group"),
-    id: Schema.String,
-    name: Schema.String,
-  }),
-  Schema.Struct({
     type: Schema.Literal("location"),
     id: Schema.String,
     name: Schema.String,
