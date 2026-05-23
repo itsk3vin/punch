@@ -86,8 +86,11 @@ export function SettingsLayout() {
   }
 
   return (
-    <SidebarProvider>
-      <Sidebar collapsible="none" className="h-screen border-r border-sidebar-border">
+    <SidebarProvider className="h-svh min-h-0 overflow-hidden">
+      <Sidebar
+        collapsible="none"
+        className="h-svh shrink-0 overflow-hidden border-r border-sidebar-border"
+      >
         <SidebarHeader className="px-3 py-2">
           <NavLink
             to={organizationPath}
@@ -98,7 +101,7 @@ export function SettingsLayout() {
           </NavLink>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent className="overflow-hidden">
           {groups.map((group, i) => (
             <SidebarGroup key={i}>
               {group.label && (
@@ -126,7 +129,7 @@ export function SettingsLayout() {
         </SidebarContent>
       </Sidebar>
 
-      <SidebarInset className="overflow-y-auto py-10 px-4">
+      <SidebarInset className="h-svh min-h-0 overflow-y-auto py-10 px-4">
         <Outlet />
       </SidebarInset>
     </SidebarProvider>
