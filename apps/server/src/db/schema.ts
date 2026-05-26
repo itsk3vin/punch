@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
+import { check, date, index, integer, pgTable, text, time, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core"
 
 export const organizations = pgTable("organizations", {
   id: uuid("id")
@@ -75,3 +76,36 @@ export const managerScopes = pgTable("manager_scopes", {
   scopeId: uuid("scope_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const employeeAvailability = pgTable(
+  "employee_availability",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    employeeId: uuid("employee_id")
+      .notNull()
+      .references(() => employees.id),
+    dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday, 6 = Saturday
+    startTime: time("start_time").notNull(),
+    endTime: time("end_time").notNull(),
+    timezone: text("timezone").notNull(),
+    effectiveFrom: date("effective_from"),
+    effectiveUntil: date("effective_until"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("employee_availability_employee_id_idx").on(table.employeeId),
+    uniqueIndex("employee_availability_unique_window_idx").on(
+      table.employeeId,
+      table.dayOfWeek,
+      table.startTime,
+      table.endTime,
+    ),
+    check("employee_availability_day_of_week_check", sql`${table.dayOfWeek} between 0 and 6`),
+    check("employee_availability_time_range_check", sql`${table.startTime} < ${table.endTime}`),
+    check(
+      "employee_availability_effective_range_check",
+      sql`${table.effectiveUntil} is null or ${table.effectiveFrom} is null or ${table.effectiveFrom} <= ${table.effectiveUntil}`,
+    ),
+  ],
+)
