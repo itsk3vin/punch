@@ -97,6 +97,10 @@ type ManagerScopeRecord = {
 const joinedDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
+});
+
+const olderJoinedDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
   year: "numeric",
 });
 
@@ -107,7 +111,14 @@ function formatJoinedDate(value: string) {
     return "Unknown";
   }
 
-  return joinedDateFormatter.format(date);
+  const now = new Date();
+  const lastCalendarYearStart = new Date(now.getFullYear() - 1, 0, 1);
+
+  if (date >= lastCalendarYearStart) {
+    return joinedDateFormatter.format(date);
+  }
+
+  return olderJoinedDateFormatter.format(date);
 }
 
 function formatRole(role: string) {
@@ -116,6 +127,19 @@ function formatRole(role: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function getRoleBadgeClassName(role: string) {
+  switch (role.toLowerCase()) {
+    case "admin":
+      return "bg-blue-100 text-blue-800";
+    case "manager":
+      return "bg-green-100 text-green-800";
+    case "employee":
+      return "bg-yellow-100 text-yellow-800";
+    default:
+      return "bg-primary/10 text-primary";
+  }
 }
 
 function getInitials(name: string, email: string) {
@@ -919,14 +943,20 @@ export function SettingsMembersRoute() {
         </div>
 
         <div className="w-full rounded-xl bg-card text-sm [&_table_td]:py-2 [&_table_th]:h-auto [&_table_th]:py-2 [&_table_th]:px-4 [&_table_td]:px-4">
-          <Table className="border-separate border-spacing-x-0 border-spacing-y-0.5 [&_tr[data-roster-row]>td]:transition-colors [&_tr[data-roster-row]>td:first-child]:rounded-l-lg [&_tr[data-roster-row]>td:last-child]:rounded-r-lg [&_tr[data-roster-row]:hover>td]:bg-muted/25">
+          <Table className="table-fixed border-separate border-spacing-x-0 border-spacing-y-0.5 [&_tr[data-roster-row]>td]:transition-colors [&_tr[data-roster-row]>td:first-child]:rounded-l-lg [&_tr[data-roster-row]>td:last-child]:rounded-r-lg [&_tr[data-roster-row]:hover>td]:bg-muted/25">
             <TableHeader className="hover:bg-transparent border-0">
               <TableRow className="hover:bg-transparent border-0">
-                <TableHead className="border-0">Name</TableHead>
-                <TableHead className="border-0">Email</TableHead>
-                <TableHead className="border-0">Status</TableHead>
-                <TableHead className="border-0">Worksite</TableHead>
-                <TableHead className="border-0 text-right">Joined</TableHead>
+                <TableHead className="border-0 w-[20%]">Name</TableHead>
+                <TableHead className="border-0 w-[32%]">Email</TableHead>
+                <TableHead className="border-0 w-[14%] text-right">
+                  Status
+                </TableHead>
+                <TableHead className="border-0 w-[18%] text-right">
+                  Worksite
+                </TableHead>
+                <TableHead className="border-0 w-[96px] text-right">
+                  Joined
+                </TableHead>
                 <TableHead className="border-0 w-[52px] text-right">
                   <span className="sr-only">Member menu</span>
                 </TableHead>
@@ -997,26 +1027,30 @@ export function SettingsMembersRoute() {
                           data-roster-row=""
                           className="hover:bg-transparent"
                         >
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-7 w-7 text-xs shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <TableCell className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex h-7 w-7 text-xs shrink-0 items-center justify-center rounded-full bg-blue-50 text-black">
                                 {getInitials(member.name, member.email)}
                               </div>
-                              <span className="">{member.name}</span>
+                              <span className="min-w-0 truncate">
+                                {member.name}
+                              </span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="truncate text-muted-foreground">
                             {member.email}
                           </TableCell>
-                          <TableCell>
-                            <span className="rounded-md bg-primary/10 px-2 py-1 text-primary">
+                          <TableCell className="min-w-0 text-right">
+                            <span
+                              className={`inline-flex max-w-full truncate rounded-md px-2 py-1 ${getRoleBadgeClassName(member.role)}`}
+                            >
                               {formatRole(member.role)}
                             </span>
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
+                          <TableCell className="truncate text-right text-muted-foreground text-sm">
                             {worksite ?? "—"}
                           </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
+                          <TableCell className="truncate text-right text-muted-foreground">
                             {formatJoinedDate(member.createdAt)}
                           </TableCell>
                           <TableCell className="text-right">
@@ -1138,31 +1172,33 @@ export function SettingsMembersRoute() {
                             data-roster-row=""
                             className="hover:bg-transparent"
                           >
-                            <TableCell>
-                              <div className="flex items-center gap-3">
+                            <TableCell className="min-w-0">
+                              <div className="flex min-w-0 items-center gap-3">
                                 <div className="flex h-7 w-7 text-xs shrink-0 items-center justify-center rounded-full border border-dashed text-muted-foreground">
                                   {getInitials(
                                     invitation.name,
                                     invitation.email,
                                   )}
                                 </div>
-                                <span className="">
+                                <span className="min-w-0 truncate">
                                   {invitation.name || invitation.email}
                                 </span>
                               </div>
                             </TableCell>
-                            <TableCell className="text-muted-foreground">
+                            <TableCell className="truncate text-muted-foreground">
                               {invitation.email}
                             </TableCell>
-                            <TableCell>
-                              <span className="rounded-md bg-primary/10 px-2 py-1 text-primary">
+                            <TableCell className="min-w-0 text-right">
+                              <span
+                                className={`inline-flex max-w-full truncate rounded-md px-2 py-1 ${getRoleBadgeClassName(invitation.role)}`}
+                              >
                                 {formatRole(invitation.role)} (Invited)
                               </span>
                             </TableCell>
-                            <TableCell className="text-muted-foreground text-md">
+                            <TableCell className="truncate text-right text-muted-foreground text-md">
                               {invScope ?? "—"}
                             </TableCell>
-                            <TableCell className="text-right text-muted-foreground">
+                            <TableCell className="truncate text-right text-muted-foreground">
                               {formatJoinedDate(invitation.createdAt)}
                             </TableCell>
                             <TableCell className="text-right">
