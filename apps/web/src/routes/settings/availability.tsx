@@ -77,7 +77,7 @@ export function SettingsAvailabilityRoute() {
   }
 
   return (
-    <section className="mx-auto w-[720px] max-w-full">
+    <section className="mx-auto w-[600px] max-w-full">
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-xl font-medium tracking-tight">Availability</h1>
