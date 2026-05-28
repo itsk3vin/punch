@@ -46,7 +46,7 @@ export const employees = pgTable("employees", {
   locationId: uuid("location_id").references(() => locations.id),
   departmentId: uuid("department_id").references(() => departments.id),
   email: text("email").notNull().unique(),
-  name: text("name").notNull(),
+  name: text("name").notNull().default(""),
   jobTitle: text("job_title"),
   role: text("role").notNull().default("employee"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

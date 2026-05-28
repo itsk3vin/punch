@@ -23,6 +23,7 @@ type LocationMember = {
   id: string;
   name: string;
   email: string;
+  jobTitle?: string | null;
   role: string;
   createdAt: string;
 };
@@ -51,6 +52,10 @@ type LocationEditableField = keyof LocationFormValues;
 const joinedDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
+});
+
+const olderJoinedDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
   year: "numeric",
 });
 
@@ -61,15 +66,24 @@ function formatJoinedDate(value: string) {
     return "Unknown";
   }
 
-  return joinedDateFormatter.format(date);
+  const now = new Date();
+  const lastCalendarYearStart = new Date(now.getFullYear() - 1, 0, 1);
+
+  if (date >= lastCalendarYearStart) {
+    return joinedDateFormatter.format(date);
+  }
+
+  return olderJoinedDateFormatter.format(date);
 }
 
-function formatRole(role: string) {
-  return role
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+function getInitials(name: string, email: string) {
+  const source = name.trim() || email.trim();
+  const parts = source.split(/\s+|@/).filter(Boolean);
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
 }
 
 function formatLocationFieldLabel(field: LocationEditableField) {
@@ -266,20 +280,25 @@ function LocationDetailsForm({
 
 function LocationMembersTable({ members }: { members: LocationMember[] }) {
   return (
-    <div className="w-full text-sm [&_table_td]:h-14 [&_table_td]:py-2 [&_table_th]:h-14 [&_table_th]:py-2">
-      <Table className="border-separate border-spacing-x-0 border-spacing-y-2 [&_tr[data-location-member-row]>td]:border-y [&_tr[data-location-member-row]>td]:border-border [&_tr[data-location-member-row]>td]:bg-background [&_tr[data-location-member-row]>td]:transition-colors [&_tr[data-location-member-row]>td:first-child]:rounded-l-lg [&_tr[data-location-member-row]>td:first-child]:border-l [&_tr[data-location-member-row]>td:last-child]:rounded-r-lg [&_tr[data-location-member-row]>td:last-child]:border-r [&_tr[data-location-member-row]:hover>td]:bg-muted/25">
+    <div className="w-full rounded-xl bg-card text-sm [&_table_td]:py-2 [&_table_th]:h-auto [&_table_th]:py-2 [&_table_th]:px-4 [&_table_td]:px-4">
+      <Table className="table-fixed border-separate border-spacing-x-0 border-spacing-y-0.5 [&_tr[data-roster-row]>td]:transition-colors [&_tr[data-roster-row]>td:first-child]:rounded-l-lg [&_tr[data-roster-row]>td:last-child]:rounded-r-lg [&_tr[data-roster-row]:hover>td]:bg-muted/25">
         <TableHeader className="hover:bg-transparent border-0">
-          <TableRow className="hover:bg-transparent border-0 [&>th]:border-y [&>th]:border-border [&>th]:bg-background [&>th:first-child]:rounded-l-lg [&>th:first-child]:border-l [&>th:last-child]:rounded-r-lg [&>th:last-child]:border-r">
-            <TableHead className="font-medium text-foreground">Name</TableHead>
-            <TableHead className="font-medium text-foreground">Role</TableHead>
-            <TableHead className="text-right">Joined</TableHead>
+          <TableRow className="hover:bg-transparent border-0">
+            <TableHead className="border-0 w-[28%]">Name</TableHead>
+            <TableHead className="border-0 w-[34%]">Email</TableHead>
+            <TableHead className="border-0 w-[22%] text-right">
+              Job title
+            </TableHead>
+            <TableHead className="border-0 w-[96px] text-right">
+              Date joined
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {members.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={3}
+                colSpan={4}
                 className="py-10 text-center text-muted-foreground"
               >
                 No members belong to this location.
@@ -289,12 +308,24 @@ function LocationMembersTable({ members }: { members: LocationMember[] }) {
             members.map((member) => (
               <TableRow
                 key={member.id}
-                data-location-member-row=""
+                data-roster-row=""
                 className="hover:bg-transparent"
               >
-                <TableCell>{member.name}</TableCell>
-                <TableCell>{formatRole(member.role)}</TableCell>
-                <TableCell className="text-right text-muted-foreground">
+                <TableCell className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-7 w-7 text-xs shrink-0 items-center justify-center rounded-full bg-blue-50 text-black">
+                      {getInitials(member.name, member.email)}
+                    </div>
+                    <span className="min-w-0 truncate">{member.name}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="truncate text-muted-foreground">
+                  {member.email}
+                </TableCell>
+                <TableCell className="truncate text-right text-muted-foreground">
+                  {member.jobTitle?.trim() || "--"}
+                </TableCell>
+                <TableCell className="truncate text-right text-muted-foreground">
                   {formatJoinedDate(member.createdAt)}
                 </TableCell>
               </TableRow>
@@ -498,7 +529,7 @@ export function SettingsLocationDetailRoute() {
 
   return (
     <section className="w-full max-w-full">
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-8">
+      <div className="flex w-full max-w-full flex-col gap-8">
         <Link
           to={`/${orgname ?? ""}/settings/locations`}
           className="text-sm text-muted-foreground hover:text-foreground mx-4"
@@ -512,23 +543,25 @@ export function SettingsLocationDetailRoute() {
           <div className="text-sm text-destructive">{loadError}</div>
         ) : location ? (
           <div className="px-4">
-            <div className="mx-auto w-full max-w-xl pt-24">
-              <LocationDetailsForm
-                location={location}
-                values={draftValues}
-                editingField={editingField}
-                savingField={savingField}
-                canEdit={canEdit}
-                onChange={(field, value) =>
-                  setDraftValues((current) => ({
-                    ...current,
-                    [field]: value,
-                  }))
-                }
-                onStartEdit={startEditingField}
-                onCancel={cancelEditingField}
-                onSave={(field) => void saveLocationField(field)}
-              />
+            <div className="w-full pt-24">
+              <div className="w-full max-w-xl">
+                <LocationDetailsForm
+                  location={location}
+                  values={draftValues}
+                  editingField={editingField}
+                  savingField={savingField}
+                  canEdit={canEdit}
+                  onChange={(field, value) =>
+                    setDraftValues((current) => ({
+                      ...current,
+                      [field]: value,
+                    }))
+                  }
+                  onStartEdit={startEditingField}
+                  onCancel={cancelEditingField}
+                  onSave={(field) => void saveLocationField(field)}
+                />
+              </div>
 
               <div className="mt-12 mb-4 flex items-center justify-between gap-3">
                 <h1 className="text-xl font-medium tracking-tight">
