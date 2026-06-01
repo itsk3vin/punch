@@ -3,7 +3,6 @@ import {
   IconBuilding,
   IconCalendar,
   IconCreditCard,
-  IconFileImport,
   IconMapPin,
   IconUser,
   IconUsers,
@@ -72,13 +71,7 @@ export function SettingsLayout() {
       { to: `${base}/billing`, label: "Billing", icon: IconCreditCard },
     );
   }
-  if (canManageOrgRoster) {
-    administrationItems.push({
-      to: `${base}/import`,
-      label: "Import",
-      icon: IconFileImport,
-    });
-  }
+
 
   const groups: NavGroup[] = [{ items: personalItems }];
   if (administrationItems.length > 0) {
