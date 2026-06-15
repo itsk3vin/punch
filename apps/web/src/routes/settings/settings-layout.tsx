@@ -7,7 +7,7 @@ import {
   IconUser,
   IconUsers,
 } from "@tabler/icons-react";
-import { NavLink, Outlet, useLocation, useParams } from "react-router";
+import { Navigate, NavLink, Outlet, useLocation, useParams } from "react-router";
 
 import {
   Sidebar,
@@ -22,6 +22,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
+import { useBillingStatus } from "@/hooks/use-billing-status";
 import { useEmployee } from "@/hooks/use-employee";
 
 interface NavItem {
@@ -39,6 +40,7 @@ export function SettingsLayout() {
   const { orgname } = useParams();
   const location = useLocation();
   const { employee } = useEmployee();
+  const { status, isLoading: isBillingLoading } = useBillingStatus();
   const currentPath = location.pathname.replace(/\/$/, "");
   const base = `/${orgname ?? ""}/settings`;
   const organizationPath = `/${orgname ?? ""}`;
@@ -46,6 +48,8 @@ export function SettingsLayout() {
   const isAdmin = role === "admin";
   const isManager = role === "manager";
   const canManageOrgRoster = isAdmin || isManager;
+  const billingRestricted =
+    status && !status.accessAllowed && !isAdmin && currentPath !== `${base}/profile`;
 
   const personalItems: NavItem[] = [
     { to: `${base}/profile`, label: "Profile", icon: IconUser },
@@ -123,7 +127,13 @@ export function SettingsLayout() {
       </Sidebar>
 
       <SidebarInset className="h-svh min-h-0 overflow-y-auto py-10 px-4">
-        <Outlet />
+        {isBillingLoading ? (
+          <div className="text-sm text-muted-foreground">Loading…</div>
+        ) : billingRestricted ? (
+          <Navigate to={`${base}/profile`} replace />
+        ) : (
+          <Outlet />
+        )}
       </SidebarInset>
     </SidebarProvider>
   );

@@ -14,6 +14,13 @@ export const config = {
   },
   databaseUrl:
     process.env.DATABASE_URL ?? "postgres://cron:cron@localhost:5432/cron",
+  appBaseUrl: process.env.APP_BASE_URL ?? "http://localhost:3000",
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY ?? "",
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+    locationMonthlyPriceId: process.env.STRIPE_LOCATION_MONTHLY_PRICE_ID ?? "",
+    locationYearlyPriceId: process.env.STRIPE_LOCATION_YEARLY_PRICE_ID ?? "",
+  },
   r2: {
     accountId: process.env.R2_ACCOUNT_ID ?? "",
     accessKeyId: process.env.R2_ACCESS_KEY_ID ?? "",

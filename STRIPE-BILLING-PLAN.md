@@ -14,10 +14,11 @@ Add server configuration for:
 
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_LOCATION_PRICE_ID`
+- `STRIPE_LOCATION_MONTHLY_PRICE_ID`
+- `STRIPE_LOCATION_YEARLY_PRICE_ID`
 - `APP_BASE_URL`
 
-Use `STRIPE_LOCATION_PRICE_ID` as the recurring price for billable locations. Use `APP_BASE_URL` to build Checkout success/cancel URLs and Billing Portal return URLs.
+Use the monthly and yearly location price IDs as the recurring prices for billable locations. Use `APP_BASE_URL` to build Checkout success/cancel URLs and Billing Portal return URLs.
 
 ## Database Fields
 
@@ -46,8 +47,9 @@ Add authenticated organization billing endpoints under `/api/v1/organizations/:i
 - Requires organization admin access.
 - Creates or reuses the organization's Stripe customer.
 - Creates a Stripe Checkout Session in subscription mode.
-- Uses the per-location price with quantity equal to the current number of locations.
-- Includes `organizationId` and `billingModel: "per_location"` metadata on the Checkout Session.
+- Accepts `billingInterval: "monthly" | "yearly"` and defaults to monthly.
+- Uses the matching per-location price with quantity equal to the current number of locations.
+- Includes `organizationId`, `billingModel: "per_location"`, and `billingInterval` metadata on the Checkout Session.
 - Returns the Checkout URL for the web client to redirect to.
 
 `POST /portal-session`

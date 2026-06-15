@@ -5,6 +5,7 @@ import {
 import { Effect } from "effect"
 
 import {
+  BillingGroupLive,
   EmployeesGroupLive,
   InvitationsGroupLive,
   MeGroupLive,
@@ -24,6 +25,7 @@ const health = Effect.gen(function* () {
 export const app = HttpRouter.empty.pipe(
   HttpRouter.options("*", Effect.succeed(json({}))),
   HttpRouter.get("/health", health),
+  HttpRouter.mount("/api/v1", BillingGroupLive),
   HttpRouter.mount("/api/v1", EmployeesGroupLive),
   HttpRouter.mount("/api/v1", InvitationsGroupLive),
   HttpRouter.mount("/api/v1", MeGroupLive),

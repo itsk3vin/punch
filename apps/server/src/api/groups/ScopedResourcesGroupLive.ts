@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { HttpRouter, HttpServerRequest } from "@effect/platform";
 import { Effect, Schema } from "effect";
 
+import { syncSubscriptionQuantityForOrganization } from "../../billing.js";
 import { db } from "../../db/index.js";
 import {
   departments,
@@ -14,6 +15,7 @@ import {
   requireDepartmentAccess,
   requireLocationAccess,
   requireManagerOrAdmin,
+  requireOrganizationBillingAccess,
   requireOrganizationAccess,
   requireOrganizationAdmin,
 } from "../middleware/organization.js";
@@ -90,6 +92,9 @@ const parseJsonBody = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
   HttpServerRequest.schemaBodyJson(schema).pipe(
     Effect.mapError(() => new Error("invalid request body")),
   );
+
+const enforceBillingAccess = (organizationId: string) =>
+  requireOrganizationBillingAccess(organizationId).pipe(Effect.either);
 
 async function assertScopeBelongsToOrganization(
   organizationId: string,
@@ -338,6 +343,10 @@ const createLocation = Effect.gen(function* () {
   if (authorized._tag === "Left") {
     return yield* handleAuthorizationError(authorized.left);
   }
+  const billing = yield* enforceBillingAccess(organizationId);
+  if (billing._tag === "Left") {
+    return yield* handleAuthorizationError(billing.left);
+  }
 
   const body = yield* parseJsonBody(LocationCreateBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
@@ -368,6 +377,11 @@ const createLocation = Effect.gen(function* () {
     catch: () => new Error("failed to create location"),
   });
 
+  yield* Effect.tryPromise({
+    try: () => syncSubscriptionQuantityForOrganization(organizationId),
+    catch: () => new Error("failed to sync billing quantity"),
+  });
+
   return yield* json(inserted[0], 201);
 }).pipe(
   Effect.catchAll((error) =>
@@ -391,6 +405,10 @@ const updateLocation = Effect.gen(function* () {
   const locAuth = yield* requireLocationAccess(locationId).pipe(Effect.either);
   if (locAuth._tag === "Left") {
     return yield* handleAuthorizationError(locAuth.left);
+  }
+  const billing = yield* enforceBillingAccess(organizationId);
+  if (billing._tag === "Left") {
+    return yield* handleAuthorizationError(billing.left);
   }
 
   const locationRows = yield* Effect.tryPromise({
@@ -531,6 +549,10 @@ const createDepartment = Effect.gen(function* () {
   if (authorized._tag === "Left") {
     return yield* handleAuthorizationError(authorized.left);
   }
+  const billing = yield* enforceBillingAccess(organizationId);
+  if (billing._tag === "Left") {
+    return yield* handleAuthorizationError(billing.left);
+  }
 
   const rows = yield* Effect.tryPromise({
     try: () =>
@@ -581,6 +603,10 @@ const updateDepartment = Effect.gen(function* () {
   );
   if (depAuth._tag === "Left") {
     return yield* handleAuthorizationError(depAuth.left);
+  }
+  const billing = yield* enforceBillingAccess(organizationId);
+  if (billing._tag === "Left") {
+    return yield* handleAuthorizationError(billing.left);
   }
 
   const existing = yield* Effect.tryPromise({
@@ -716,6 +742,10 @@ const assignManagerScope = Effect.gen(function* () {
   if (admin._tag === "Left") {
     return yield* handleAuthorizationError(admin.left);
   }
+  const billing = yield* enforceBillingAccess(organizationId);
+  if (billing._tag === "Left") {
+    return yield* handleAuthorizationError(billing.left);
+  }
 
   const body = yield* parseJsonBody(ManagerScopeMutationBody).pipe(
     Effect.catchAll(() => Effect.fail(new Error("invalid request body"))),
@@ -805,6 +835,10 @@ const revokeManagerScope = Effect.gen(function* () {
   );
   if (admin._tag === "Left") {
     return yield* handleAuthorizationError(admin.left);
+  }
+  const billing = yield* enforceBillingAccess(organizationId);
+  if (billing._tag === "Left") {
+    return yield* handleAuthorizationError(billing.left);
   }
 
   const row = yield* Effect.tryPromise({

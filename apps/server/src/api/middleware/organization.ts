@@ -12,8 +12,10 @@ import {
   employees,
   locations,
   managerScopes,
+  organizations,
 } from "../../db/schema.js"
 import { json } from "../response.js"
+import { hasCoreBillingAccess } from "../../billing.js"
 
 class ApiError extends Error {
   constructor(
@@ -87,6 +89,27 @@ export const requireOrganizationAdmin = (organizationId: string) =>
     }
 
     return currentEmployee
+  })
+
+export const requireOrganizationBillingAccess = (organizationId: string) =>
+  Effect.gen(function* () {
+    const results = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ status: organizations.stripeSubscriptionStatus })
+          .from(organizations)
+          .where(eq(organizations.id, organizationId))
+          .limit(1),
+      catch: () => new ApiError("failed to validate billing access", 500),
+    })
+
+    const organization = results[0]
+    if (!organization) {
+      return yield* Effect.fail(new ApiError("organization not found", 404))
+    }
+    if (!hasCoreBillingAccess(organization.status)) {
+      return yield* Effect.fail(new ApiError("billing access restricted", 402))
+    }
   })
 
 async function managerHasScopedAccessToLocation(

@@ -57,6 +57,20 @@
       "when": 1779841933615,
       "tag": "0007_gigantic_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780783200000,
+      "tag": "0008_add_stripe_billing",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1781550354003,
+      "tag": "0009_youthful_greymalkin",
+      "breakpoints": true
     }
   ]
 }
