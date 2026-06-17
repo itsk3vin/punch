@@ -1,7 +1,6 @@
 import "dotenv/config"
 import { faker } from "@faker-js/faker"
 import { eq } from "drizzle-orm"
-
 import { db, sql } from "../src/db/index.js"
 import {
   employees,
@@ -9,11 +8,15 @@ import {
   locations,
   managerScopes,
   organizations,
+  products,
+  prices,
+  subscriptions,
+  customers,
 } from "../src/db/schema.js"
 
 const ADMIN_USER_ID = "google-oauth2|116423573323662097945"
-const ORGANIZATION_NAME = "Cron Demo Organization"
-const ORGANIZATION_SLUG = "cron-demo"
+const ORGANIZATION_NAME = "Cron"
+const ORGANIZATION_SLUG = "cron"
 
 const locationSeeds = [
   {
@@ -172,6 +175,72 @@ async function seed() {
     .insert(invitations)
     .values(inviteValues)
     .returning()
+  
+
+  const productValues: (typeof products.$inferInsert)[] = [
+    {
+      id: "prod_Ui2pa2NYyY0XaF",
+      name: "Essentials",
+      description: "Essentials plan",
+      active: true,
+    },
+  ]
+
+  const seededProducts = await db
+    .insert(products)
+    .values(productValues)
+    .returning()
+
+  const priceValues: (typeof prices.$inferInsert)[] = [
+    {
+      id: "price_1Tick4ACPPOkdETh1hk3FiGs",
+      productId: seededProducts[0].id,
+      unitAmount: 2800,
+      interval: "month",
+      active: true,
+    }, 
+    {
+      id: "price_1TicmLACPPOkdEThzVaSqrNf",
+      productId: seededProducts[0].id,
+      unitAmount: 25200,
+      interval: "year",
+      active: true,
+    }
+  ]
+  const seededPrices = await db
+    .insert(prices)
+    .values(priceValues)
+    .returning()
+
+  const customerValues: (typeof customers.$inferInsert)[] = [
+    {
+      organizationId: organization.id,
+      stripeCustomerId: "cus_Ui67SZyrJSzetQ",
+    }
+  ]
+
+  const seededCustomers = await db
+    .insert(customers)
+    .values(customerValues)
+    .returning()
+
+  const subscriptionValues: (typeof subscriptions.$inferInsert)[] = [
+    {
+      id: "sub_1TjPRDACPPOkdEThjWpn7n4o",
+      customerId: seededCustomers[0].stripeCustomerId,
+      status: "active",
+      priceId: seededPrices[0].id,
+      quantity: 1,
+      cancelAtPeriodEnd: false,
+      createdAt: new Date(),
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: new Date(),
+    }
+  ]
+  const seededSubscriptions = await db
+    .insert(subscriptions)
+    .values(subscriptionValues)
+    .returning()
 
   console.log("Seed complete")
   console.table({
@@ -181,6 +250,10 @@ async function seed() {
     managers: managers.length,
     employees: seededEmployees.length,
     unacceptedInvites: seededInvites.length,
+    products: seededProducts.length,
+    prices: seededPrices.length,
+    customers: seededCustomers.length,
+    subscriptions: seededSubscriptions.length,
   })
 }
 

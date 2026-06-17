@@ -12,16 +12,16 @@ import {
   updateOrganizationFromCheckoutSession,
   updateOrganizationFromSubscription,
   clearOrganizationSubscription,
-} from "../../billing.js"
-import { config } from "../../config.js"
-import { db } from "../../db/index.js"
-import { organizations } from "../../db/schema.js"
+} from "../../../billing.js"
+import { config } from "../../../config.js"
+import { db } from "../../../db/index.js"
+import { organizations } from "../../../db/schema.js"
 import {
   handleAuthorizationError,
   requireOrganizationAccess,
   requireOrganizationAdmin,
-} from "../middleware/organization.js"
-import { json } from "../response.js"
+} from "../../middleware/organization.js"
+import { json } from "../../response.js"
 
 const OrgParams = Schema.Struct({
   id: Schema.String,

@@ -10,16 +10,16 @@ import {
 } from "drizzle-orm"
 import { Effect, Schema } from "effect"
 
-import { verifyBearerToken } from "../../auth.js"
-import { fetchEmployeeScopesForMe } from "../middleware/organization.js"
-import { db } from "../../db/index.js"
+import { verifyBearerToken } from "../../../auth.js"
+import { fetchEmployeeScopesForMe } from "../../middleware/organization.js"
+import { db } from "../../../db/index.js"
 import {
   employees,
   invitations,
   organizations,
-} from "../../db/schema.js"
-import { getSignedAssetReadUrl } from "../../r2.js"
-import { json } from "../response.js"
+} from "../../../db/schema.js"
+import { getSignedAssetReadUrl } from "../../../r2.js"
+import { json } from "../../response.js"
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message.length > 0) {
